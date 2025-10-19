@@ -1,0 +1,11 @@
+# Kafka Client
+confluent-kafka>=2.3.0
+
+# HTTP requests for API
+requests>=2.31.0
+
+# Data processing
+python-dateutil>=2.8.2
+
+# Utilities
+python-dotenv>=1.0.0
