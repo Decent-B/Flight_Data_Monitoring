@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  nifi:
+    image: apache/nifi:latest
+    container_name: project_nifi
+    restart: unless-stopped
+    ports:
+      # Expose only HTTPS for NiFi UI
+      - "8443:8443"
+      # (Optional) If you still want HTTP for dev, uncomment below and adjust nifi envs accordingly
+      # - "8080:8080"
+    environment:
+      # Force NiFi to listen on HTTPS (default for many NiFi images)
+      - NIFI_WEB_HTTPS_HOST=0.0.0.0
+      - NIFI_WEB_HTTPS_PORT=8443
+      # Ensure HTTP is not implicitly enabled
+      # (Do not set NIFI_WEB_HTTP_PORT here if you want HTTPS-only mode)
+      # Optional: set a stable sensitive props key if you want encrypted sensitive properties to be portable
+      # - NIFI_SENSITIVE_PROPS_KEY=replace_with_a_strong_key
+    # Named volumes for all NiFi data/config (per your request)
+    volumes:
+      - nifi_conf:/opt/nifi/nifi-current/conf
+      - nifi_flowfile_repo:/opt/nifi/nifi-current/flowfile_repository
+      - nifi_content_repo:/opt/nifi/nifi-current/content_repository
+      - nifi_provenance_repo:/opt/nifi/nifi-current/provenance_repository
+      - nifi_database_repo:/opt/nifi/nifi-current/database_repository
+      - nifi_logs:/opt/nifi/nifi-current/logs
+      - nifi_state:/opt/nifi/nifi-current/state
+
+    # Robust healthcheck: uses HTTPS, accepts self-signed certs, waits a bit before starting checks
+    healthcheck:
+      test: ["CMD-SHELL", "curl -kSf --max-time 10 https://localhost:8443/nifi/ >/dev/null 2>&1 || (echo 'NiFi healthcheck failed' >&2; exit 1)"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  nifi_conf:
+  nifi_flowfile_repo:
+  nifi_content_repo:
+  nifi_provenance_repo:
+  nifi_database_repo:
+  nifi_logs:
+  nifi_state:
