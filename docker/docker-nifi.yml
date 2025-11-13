@@ -8,10 +8,10 @@ services:
     ports:
       # Expose only HTTPS for NiFi UI
       - "8443:8443"
-      # (Optional) If you still want HTTP for dev, uncomment below and adjust nifi envs accordingly
-      # - "8080:8080"
     environment:
       # Force NiFi to listen on HTTPS (default for many NiFi images)
+      - SINGLE_USER_CREDENTIALS_USERNAME=admin
+      - SINGLE_USER_CREDENTIALS_PASSWORD=Utlinhsaygex123.
       - NIFI_WEB_HTTPS_HOST=0.0.0.0
       - NIFI_WEB_HTTPS_PORT=8443
       # Ensure HTTP is not implicitly enabled
@@ -35,7 +35,8 @@ services:
       timeout: 15s
       retries: 5
       start_period: 60s
-
+    networks:
+      - docker_flight-network   # Connect NiFi to the shared flight-network
 volumes:
   nifi_conf:
   nifi_flowfile_repo:
@@ -44,3 +45,7 @@ volumes:
   nifi_database_repo:
   nifi_logs:
   nifi_state:
+
+networks:
+  docker_flight-network:
+    external: true

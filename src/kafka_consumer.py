@@ -89,7 +89,7 @@ class FlightDataConsumer:
         # Example processing: calculate derived fields
         try:
             # Calculate speed in km/h if velocity is available
-            if message.get('velocity'):
+            if message['velocity']:
                 message['speed_kmh'] = message['velocity'] * 3.6
             
             # Add processing timestamp
@@ -151,7 +151,7 @@ class FlightDataConsumer:
                 try:
                     # Deserialize message
                     key = msg.key().decode('utf-8') if msg.key() else None
-                    value = json.loads(msg.value().decode('utf-8'))
+                    value = json.loads(msg.value().decode('utf-8'))[0]
                     
                     self.messages_consumed += 1
                     
