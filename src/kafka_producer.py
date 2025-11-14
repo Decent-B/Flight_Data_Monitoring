@@ -199,7 +199,7 @@ class FlightDataProducer:
             self.produce_message(message)
             queued += 1
         
-        # Wait for all messages to be delivered
+        # Wait for all messages to be delivered, return number of undelivered messages
         remaining = self.producer.flush(timeout=30)
         
         if remaining > 0:
