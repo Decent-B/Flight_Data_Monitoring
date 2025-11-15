@@ -37,6 +37,46 @@ services:
       start_period: 60s
     networks:
       - docker_flight-network   # Connect NiFi to the shared flight-network
+
+  nifi-registry:
+    image: apache/nifi-registry:latest
+    container_name: nifi-registry
+    restart: unless-stopped
+    ports:
+      - "18080:18080"
+    volumes:
+      - registry_conf:/opt/nifi-registry/nifi-registry-current/conf
+      - registry_db:/opt/nifi-registry/nifi-registry-current/database
+    networks:
+      - docker_flight-network
+
+  flow-deployer:
+    image: python:3.11-slim
+    container_name: flow-deployer
+    depends_on:
+      - nifi
+      - nifi-registry
+    # mount flows and the script into container
+    volumes:
+      - ../nifi/flows:/flows:ro
+      - ../nifi/scripts:/scripts:ro
+    networks:
+      - docker_flight-network
+    environment:
+      - NIFI_API_URL=https://localhost:8443/nifi
+      - REGISTRY_API_URL=http://nifi-registry:18080
+      - NIFI_USERNAME=admin
+      - NIFI_PASSWORD=Utlinhsaygex123.
+      # Set to "true" if you want to ignore self-signed cert issues (dev only)
+      - INSECURE_SKIP_TLS_VERIFY=true
+    entrypoint:
+      - bash
+      - -c
+      - |
+        set -euo pipefail
+        pip install --no-cache-dir nipyapi requests || exit 1
+        # run script; it will retry/wait for services
+        python /scripts/deploy_flow.py    
 volumes:
   nifi_conf:
   nifi_flowfile_repo:
@@ -45,6 +85,8 @@ volumes:
   nifi_database_repo:
   nifi_logs:
   nifi_state:
+  registry_conf:
+  registry_db:
 
 networks:
   docker_flight-network:
