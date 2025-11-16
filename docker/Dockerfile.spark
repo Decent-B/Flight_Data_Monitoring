@@ -5,6 +5,7 @@ USER root
 # Install Python dependencies
 RUN pip install --no-cache-dir confluent-kafka requests python-dateutil
  
+
 # Copy application code
 COPY src/kafka_reader.py /app/kafka_reader.py
  
