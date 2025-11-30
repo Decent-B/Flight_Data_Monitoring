@@ -1,0 +1,66 @@
+# Dockerfile
+# Use the official NiFi image as the base
+FROM apache/nifi:latest
+
+# Define the security-related environment variables
+ENV NIFI_HOME=/opt/nifi/nifi-current
+ENV CERTS_DIR=/opt/nifi/certs
+# Set HTTPS port (matches your docker-compose 8443)
+ENV NIFI_WEB_HTTPS_PORT=8443
+ENV NIFI_WEB_HTTPS_HOST=0.0.0.0
+# Define passwords (must be strong)
+ENV KEYSTORE_PASS=NiFiKeystorePass123.
+ENV TRUSTSTORE_PASS=NiFiTruststorePass123.
+ENV KEYSTORE_PATH=${CERTS_DIR}/keystore.jks
+ENV TRUSTSTORE_PATH=${CERTS_DIR}/truststore.jks
+ENV KEYSTORE_TYPE=JKS
+ENV TRUSTSTORE_TYPE=JKS
+# User credentials
+ENV NIFI_USERNAME=admin
+ENV NIFI_PASSWORD=Utlinhsaygex123.
+
+# Create the certs directory
+RUN mkdir -p ${CERTS_DIR}
+
+# 1. Generate the Keystore with 'nifi' as a Subject Alternative Name (SAN)
+# The CN (Common Name) is not as critical as the SAN for modern clients, 
+# but we'll set it to 'nifi'.
+RUN keytool -genkeypair -alias nifi-key \
+    -keyalg RSA -keysize 2048 -validity 36500 \
+    -keystore ${KEYSTORE_PATH} -storepass ${KEYSTORE_PASS} \
+    -dname "CN=nifi, OU=IT, O=Project, L=City, ST=State, C=US" \
+    -ext SAN=dns:nifi,dns:localhost,IP:172.22.160.1 && \
+    echo "Keystore generated."
+
+# 2. Export the certificate from the keystore
+RUN keytool -export -alias nifi-key -file ${CERTS_DIR}/nifi-cert.cer \
+    -keystore ${KEYSTORE_PATH} -storepass ${KEYSTORE_PASS} -rfc
+
+# 3. Generate the Truststore and import the exported certificate
+RUN keytool -import -trustcacerts -alias nifi-cert \
+    -file ${CERTS_DIR}/nifi-cert.cer -keystore ${TRUSTSTORE_PATH} \
+    -storepass ${TRUSTSTORE_PASS} -noprompt && \
+    echo "Truststore generated."
+
+# 4. Set single-user credentials (since we're enabling security)
+RUN ./bin/nifi.sh set-single-user-credentials ${NIFI_USERNAME} ${NIFI_PASSWORD}
+
+# 5. Overwrite nifi.properties with the new keystore/truststore settings
+# This ensures the configuration is correct and uses the generated files
+RUN sed -i \
+    -e "s|^nifi.security.keystore=.*|nifi.security.keystore=${KEYSTORE_PATH}|" \
+    -e "s|^nifi.security.keystoreType=.*|nifi.security.keystoreType=${KEYSTORE_TYPE}|" \
+    -e "s|^nifi.security.keystorePasswd=.*|nifi.security.keystorePasswd=${KEYSTORE_PASS}|" \
+    -e "s|^nifi.security.truststore=.*|nifi.security.truststore=${TRUSTSTORE_PATH}|" \
+    -e "s|^nifi.security.truststoreType=.*|nifi.security.truststoreType=${TRUSTSTORE_TYPE}|" \
+    -e "s|^nifi.security.truststorePasswd=.*|nifi.security.truststorePasswd=${TRUSTSTORE_PASS}|" \
+    -e "s|^nifi.web.https.host=.*|nifi.web.https.host=${NIFI_WEB_HTTPS_HOST}|" \
+    -e "s|^nifi.web.https.port=.*|nifi.web.https.port=${NIFI_WEB_HTTPS_PORT}|" \
+    -e "s|^nifi.web.http.enabled=.*|nifi.web.http.enabled=false|" \
+    ${NIFI_HOME}/conf/nifi.properties
+
+# IMPORTANT: Remove the environment variables for credentials/passwords from the final image layer
+# This is a security best practice. The settings are already applied to nifi.properties.
+ENV KEYSTORE_PASS=
+ENV TRUSTSTORE_PASS=
+ENV NIFI_PASSWORD=

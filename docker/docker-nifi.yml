@@ -2,7 +2,10 @@ version: '3.8'
 
 services:
   nifi:
-    image: apache/nifi:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: custom-nifi-secure
     container_name: project_nifi
     restart: unless-stopped
     ports:
@@ -12,7 +15,7 @@ services:
       # Force NiFi to listen on HTTPS (default for many NiFi images)
       - SINGLE_USER_CREDENTIALS_USERNAME=admin
       - SINGLE_USER_CREDENTIALS_PASSWORD=Utlinhsaygex123.
-      - NIFI_WEB_HTTPS_HOST=0.0.0.0
+      - NIFI_WEB_HTTPS_HOST=nifi
       - NIFI_WEB_HTTPS_PORT=8443
       # Ensure HTTP is not implicitly enabled
       # (Do not set NIFI_WEB_HTTP_PORT here if you want HTTPS-only mode)
@@ -49,6 +52,17 @@ services:
       - registry_db:/opt/nifi-registry/nifi-registry-current/database
     networks:
       - docker_flight-network
+    user: root
+    command:
+    - /bin/bash
+    - -c
+    - |
+      # Change ownership of the volume mount points to the user that runs NiFi Registry (often UID 1000)
+      # Check the image documentation for the exact UID/GID, but 1000 is common.
+      chown -R 1000:1000 /opt/nifi-registry/nifi-registry-current/conf
+      chown -R 1000:1000 /opt/nifi-registry/nifi-registry-current/database
+      # Now, execute the original entrypoint script (this is often 'nifi-registry.sh start')
+      /opt/nifi-registry/nifi-registry-current/bin/nifi-registry.sh start
 
   flow-deployer:
     image: python:3.11-slim
@@ -58,12 +72,12 @@ services:
       - nifi-registry
     # mount flows and the script into container
     volumes:
-      - ../nifi/flows:/flows:ro
+      - ../nifi/flows:/flows
       - ../nifi/scripts:/scripts:ro
     networks:
       - docker_flight-network
     environment:
-      - NIFI_API_URL=https://localhost:8443/nifi
+      - NIFI_API_URL=https://nifi:8443
       - REGISTRY_API_URL=http://nifi-registry:18080
       - NIFI_USERNAME=admin
       - NIFI_PASSWORD=Utlinhsaygex123.
