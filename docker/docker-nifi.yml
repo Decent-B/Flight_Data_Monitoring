@@ -4,7 +4,7 @@ services:
   nifi:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.nifi
     image: custom-nifi-secure
     container_name: project_nifi
     restart: unless-stopped
