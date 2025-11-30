@@ -19,7 +19,7 @@ services:
     container_name: kafka-broker-1
     ports:
       - "29092:29092" # host -> container mapping for client on host 
-      # - "9092:9092" # optional: expose internal port too (usually not needed)
+      - "9092:9092" # optional: expose internal port too (usually not needed)
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181

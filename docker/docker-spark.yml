@@ -1,0 +1,26 @@
+version: '3.8'
+ 
+ 
+services:
+  spark-kafka-reader:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.spark
+    image: flight-data-spark:latest
+    container_name: spark-kafka-reader
+    ports:
+      - "4040:4040"  # Spark Application UI
+    command: >
+      /opt/spark/bin/spark-submit
+        --master local[*]
+        --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.0
+        --conf spark.sql.streaming.checkpointLocation=/tmp/checkpoints
+        /app/kafka_reader.py
+    restart: unless-stopped
+    networks:
+      - flight-network
+ 
+networks:
+  flight-network:
+    external: true
+    name: docker_flight-network

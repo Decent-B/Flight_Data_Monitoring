@@ -1,0 +1,28 @@
+FROM apache/spark-py:v3.4.0
+ 
+USER root
+ 
+# Install Python dependencies
+RUN pip install --no-cache-dir confluent-kafka requests python-dateutil
+ 
+
+# Copy application code
+COPY src/kafka_reader.py /app/kafka_reader.py
+ 
+# Update Kafka bootstrap servers for Docker network - use internal container names
+RUN sed -i 's/localhost:29092,localhost:29093,localhost:29094/kafka-broker-1:9092,kafka-broker-2:9092,kafka-broker-3:9092/g' /app/kafka_reader.py
+ 
+# Create directories with proper permissions
+RUN mkdir -p /tmp/checkpoints /tmp/spark-events /opt/spark/.ivy2 /opt/spark/work-dir && \
+    chmod -R 777 /tmp/checkpoints /tmp/spark-events /opt/spark/.ivy2 && \
+    chown -R 185:0 /app /opt/spark/.ivy2 /opt/spark/work-dir && \
+    chmod -R 775 /app /opt/spark/work-dir
+ 
+# Set working directory
+WORKDIR /opt/spark/work-dir
+ 
+# Switch back to spark user
+USER 185
+ 
+# Default command (will be overridden by docker-compose)
+CMD ["/opt/spark/bin/spark-submit", "/app/kafka_reader.py"]
