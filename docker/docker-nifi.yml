@@ -99,6 +99,8 @@ volumes:
   nifi_database_repo:
   nifi_logs:
   nifi_state:
+  registry_conf:
+  registry_db:
 
 networks:
   docker_flight-network:
