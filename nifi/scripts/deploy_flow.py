@@ -370,16 +370,7 @@ def main():
                     imported = flow
                     break
 
-            versioned_flow_snapshot = registry.models.VersionedFlowSnapshot(
-                flow_contents=flow_content_dict,
-                snapshot_metadata=registry.models.VersionedFlowSnapshotMetadata(
-                    author="ankhanhtran02",
-                    bucket_identifier=bucket.identifier,
-                    flow_identifier=imported.identifier,
-                )
-            )
 
-            versioned_flow_snapshot_json = utils.dump(versioned_flow_snapshot)
             if imported is None:
                 # Case 1: Flow container does not exist. Create container and version 1.
                 print(f"Flow '{FLOW_NAME}' not found. Creating new flow container and version 1.")
@@ -398,8 +389,17 @@ def main():
                 print("Imported flow container. Registry flow id:", imported.identifier)
                 
                 # Explicitly Save Version 1
+                versioned_flow_snapshot = registry.models.VersionedFlowSnapshot(
+                    flow_contents=flow_content_dict,
+                    snapshot_metadata=registry.models.VersionedFlowSnapshotMetadata(
+                        author="ankhanhtran02",
+                        bucket_identifier=bucket.identifier,
+                        flow_identifier=imported.identifier,
+                    )
+                )
 
-                
+                versioned_flow_snapshot_json = utils.dump(versioned_flow_snapshot)
+                    
                 saved_version = versioning.import_flow_version(
                     bucket_id=bucket.identifier,
                     flow_id=imported.identifier,
@@ -412,11 +412,22 @@ def main():
                 # Case 2: Flow container exists. Check for change.
                 print(f"Flow '{FLOW_NAME}' found. Checking if new version is required.")
                 
+
                 versions = registry.apis.flows_api.FlowsApi().get_flow_versions1(imported.identifier)
+                
                 if not versions:
                     # Fallback in case of a corrupted flow container (no versions)
                     print("WARNING: Flow found but has no versions. Saving version 1.")
-                    
+                    versioned_flow_snapshot = registry.models.VersionedFlowSnapshot(
+                        flow_contents=flow_content_dict,
+                        snapshot_metadata=registry.models.VersionedFlowSnapshotMetadata(
+                            author="ankhanhtran02",
+                            bucket_identifier=bucket.identifier,
+                            flow_identifier=imported.identifier,
+                        )
+                    )
+
+                    versioned_flow_snapshot_json = utils.dump(versioned_flow_snapshot)
                     saved_version = versioning.import_flow_version(
                         bucket_id=bucket.identifier,
                         flow_id=imported.identifier,
