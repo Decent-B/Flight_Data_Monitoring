@@ -44,12 +44,16 @@ echo ""
 
 # 6. Build Spark image
 echo "Step 6: Building Spark image..."
-docker-compose -f docker/docker-spark.yml build
+docker-compose -f docker/docker-spark.yml build -q
 echo "✓ Spark image built"
 echo ""
 
 # 7. Run dummy data loader
 echo "Step 7: Running dummy data loader..."
+
+# Enable pipefail so if docker fails, the script fails (even with grep attached)
+set -o pipefail
+
 docker run --rm --network docker_flight-network flight-data-spark:latest \
     /opt/spark/bin/spark-submit \
     --master local[*] \
@@ -58,7 +62,12 @@ docker run --rm --network docker_flight-network flight-data-spark:latest \
     --conf spark.cassandra.connection.host=cassandra-1,cassandra-2,cassandra-3 \
     --conf spark.cassandra.connection.port=9042 \
     --conf spark.cassandra.connection.keepAliveMS=60000 \
-    /app/spark_dummy_loader.py
+    /app/spark_dummy_loader.py \
+    | grep --line-buffered -vE "^[0-9/]+ [0-9:]+ INFO"
+
+# Disable pipefail to return to normal bash behavior (optional)
+set +o pipefail
+
 echo ""
 
 # 8. Verify data was written to ALL tables
@@ -67,7 +76,7 @@ echo "Step 8: Verifying data integrity across all tables..."
 # Define all tables to check
 TABLES=(
     "aircrafts_by_icao24"
-    "aircraftstates_by_icao24_date"
+    "aircraftstates_by_icao24"
     "aircrafts_by_cell_minute"
     "trafficdensity_by_cell_minute"
     "activeaircraft_by_country_hour"
@@ -137,7 +146,7 @@ fi
 # Check 3: Verify aircraft states have valid positions
 echo "Test 3: Checking aircraft states have valid latitude/longitude..."
 
-position_check=$(docker exec -i cassandra-1 cqlsh -e "SELECT lat, lon FROM flight_analytics.aircraftstates_by_icao24_date LIMIT 1;" | grep -oE '[0-9]+\.[0-9]+' | head -n 1)
+position_check=$(docker exec -i cassandra-1 cqlsh -e "SELECT latitude, longitude FROM flight_analytics.aircraftstates_by_icao24 LIMIT 1;" | grep -oE '[0-9]+\.[0-9]+' | head -n 1)
 
 if [ -z "$position_check" ]; then
     echo "❌ FAILURE: No aircraft states with valid position data."

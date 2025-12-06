@@ -26,6 +26,8 @@ spark = SparkSession \
     .appName("DummyDataLoader") \
     .getOrCreate()
 
+spark.sparkContext.setLogLevel("WARN")
+
 print("\n✓ Spark Session initialized")
 print(f"Spark Version: {spark.version}")
 
@@ -123,44 +125,62 @@ print(f"Generated {len(aircrafts_data)} dummy records")
 write_and_preview(aircrafts_df, "aircrafts_by_icao24")
 
 print("\n" + "=" * 80)
-print("TABLE 2: aircraftstates_by_icao24_date")
+print("TABLE 2: aircraftstates_by_icao24")
 print("=" * 80)
 
-# Table 2: aircraftstates_by_icao24_date - Time series data
+# Table 2: aircraftstates_by_icao24 - Flight tracks with waypoints
 aircraftstates_data = []
 for aircraft in aircraft_ids[:50]:   # first 50 aircraft, or use all
-    for i in range(NUM_AIRCRAFT_STATES):
-        ts = current_ts - (i * 60)   # every minute backward
-        aircraftstates_data.append((
-            aircraft,
-            current_date,
-            ts,
-            10000.0 - (i * 50),                     # change these formulas as you like
-            250.0 - (i * 1.5),
-            10.0 + random.uniform(-5, 5),          # random-ish lat
-            100.0 + random.uniform(-5, 5),         # random-ish lon
-            180.0,
-            -5.0 if i > 0 else 0.0,
-            False,
-        ))
+    # Generate 2-3 flights per aircraft
+    num_flights = random.randint(2, 3)
+    for flight_num in range(num_flights):
+        # Each flight starts at a different time (spread across last 24 hours)
+        flight_start = current_ts - (flight_num * 8 * 3600) - random.randint(0, 3600)
+        flight_duration = random.randint(7200, 14400)  # 2-4 hour flights
+        flight_end = flight_start + flight_duration
+        
+        # Generate callsign for this flight
+        flight_callsign = f"{random.choice(countries[:-1])}{random.randint(100, 999)}"
+        
+        # Generate waypoints for this flight (every 2 minutes)
+        num_waypoints = flight_duration // 120
+        for i in range(num_waypoints):
+            waypoint_time = flight_start + (i * 120)
+            
+            # Simulate flight trajectory
+            base_lat = random.uniform(-80, 80)
+            base_lon = random.uniform(-180, 180)
+            
+            aircraftstates_data.append((
+                aircraft,
+                flight_start,
+                waypoint_time,
+                base_lat + (i * 0.01),              # latitude changes slightly
+                base_lon + (i * 0.01),              # longitude changes slightly
+                10000.0 + random.uniform(-500, 500), # cruising altitude with variation
+                random.uniform(0, 360),              # true_track
+                i == 0 or i == (num_waypoints - 1), # on_ground at start/end
+                flight_callsign,
+                flight_end,
+            ))
 
 aircraftstates_schema = StructType([
     StructField("icao24", StringType(), False),
-    StructField("date_bucket", LongType(), False),
-    StructField("ts", LongType(), False),
-    StructField("geo_altitude", DoubleType(), True),
-    StructField("velocity", DoubleType(), True),
-    StructField("lat", DoubleType(), True),
-    StructField("lon", DoubleType(), True),
+    StructField("starttime", LongType(), False),
+    StructField("time", LongType(), False),
+    StructField("latitude", DoubleType(), True),
+    StructField("longitude", DoubleType(), True),
+    StructField("baro_altitude", DoubleType(), True),
     StructField("true_track", DoubleType(), True),
-    StructField("vertical_rate", DoubleType(), True),
     StructField("on_ground", BooleanType(), True),
+    StructField("callsign", StringType(), True),
+    StructField("endtime", LongType(), True),
 ])
 
 aircraftstates_df = spark.createDataFrame(aircraftstates_data, schema=aircraftstates_schema)
 print(f"Generated {aircraftstates_df.count()} dummy records")
 
-write_and_preview(aircraftstates_df, "aircraftstates_by_icao24_date")
+write_and_preview(aircraftstates_df, "aircraftstates_by_icao24")
 
 print("\n" + "=" * 80)
 print("TABLE 3: aircrafts_by_cell_minute")
@@ -318,7 +338,7 @@ print("✓✓✓ DUMMY DATA LOADING COMPLETE ✓✓✓")
 print("=" * 80)
 print("\nSuccessfully loaded data into all 7 tables:")
 print("  ✓ aircrafts_by_icao24")
-print("  ✓ aircraftstates_by_icao24_date")
+print("  ✓ aircraftstates_by_icao24")
 print("  ✓ aircrafts_by_cell_minute")
 print("  ✓ trafficdensity_by_cell_minute")
 print("  ✓ activeaircraft_by_country_hour")

@@ -24,22 +24,25 @@ CREATE TABLE IF NOT EXISTS aircrafts_by_icao24 (
     PRIMARY KEY (icao24)
 );
 
--- Table 2: aircraftstates_by_icao24_date
--- Supports Q3: Per-Aircraft Time Series Within a Day
--- Stores historical state data partitioned by aircraft and date
-CREATE TABLE IF NOT EXISTS aircraftstates_by_icao24_date (
+-- Table 2: aircraftstates_by_icao24
+-- Supports Q3: Per-Aircraft Time Series (Flight Tracks)
+-- Stores flight tracks with waypoints partitioned by aircraft and flight start time
+CREATE TABLE IF NOT EXISTS aircraftstates_by_icao24 (
     icao24 text,
-    date_bucket bigint,
-    ts bigint,
-    geo_altitude double,
-    velocity double,
-    lat double,
-    lon double,
-    true_track double,
-    vertical_rate double,
-    on_ground boolean,
-    PRIMARY KEY ((icao24, date_bucket), ts)
-) WITH CLUSTERING ORDER BY (ts ASC);
+    starttime bigint,          -- FlightTrack.startTime (identifies the flight)
+    time bigint,               -- Waypoint.time
+
+    latitude double,           -- Waypoint.latitude
+    longitude double,          -- Waypoint.longitude
+    baro_altitude double,      -- Waypoint.baro_altitude
+    true_track double,         -- Waypoint.true_track
+    on_ground boolean,         -- Waypoint.on_ground
+
+    callsign text,             -- FlightTrack.callsign
+    endtime bigint,            -- FlightTrack.endTime
+
+    PRIMARY KEY ((icao24, starttime), time)
+) WITH CLUSTERING ORDER BY (time ASC);
 
 -- Table 3: aircrafts_by_cell_minute
 -- Supports Q1: Live Map by Region & Minute

@@ -182,7 +182,7 @@ docker exec -i cassandra-1 cqlsh < cassandra/schema/create_tables.cql
 **What this does:** Creates these tables in the `flight_analytics` keyspace:
 
 1. **aircrafts_by_icao24** — Current state of each aircraft
-2. **aircraftstates_by_icao24_date** — Historical time-series data per aircraft
+2. **aircraftstates_by_icao24** — Flight tracks with waypoints (time-series data per flight)
 3. **aircrafts_by_cell_minute** — Aircraft positions by geographic region and time
 4. **trafficdensity_by_cell_minute** — Traffic density heatmap data
 5. **activeaircraft_by_country_hour** — Hourly active aircraft counts by country
@@ -243,7 +243,7 @@ docker run --rm --network docker_flight-network flight-data-spark:latest /opt/sp
 
 ```
 ✓ Written to aircrafts_by_icao24
-✓ Written to aircraftstates_by_icao24_date
+✓ Written to aircraftstates_by_icao24
 ✓ Written to aircrafts_by_cell_minute
 ✓ Written to trafficdensity_by_cell_minute
 ✓ Written to activeaircraft_by_country_hour
@@ -269,7 +269,7 @@ See how many records are in each table:
 
 ```bash
 docker exec -i cassandra-1 cqlsh -e "SELECT COUNT(*) FROM flight_analytics.aircrafts_by_icao24;"
-docker exec -i cassandra-1 cqlsh -e "SELECT COUNT(*) FROM flight_analytics.aircraftstates_by_icao24_date;"
+docker exec -i cassandra-1 cqlsh -e "SELECT COUNT(*) FROM flight_analytics.aircraftstates_by_icao24;"
 docker exec -i cassandra-1 cqlsh -e "SELECT COUNT(*) FROM flight_analytics.aircrafts_by_cell_minute;"
 ```
 
@@ -286,12 +286,12 @@ docker exec -i cassandra-1 cqlsh -e "SELECT * FROM flight_analytics.aircrafts_by
 
 **What you'll see:** Current position, altitude, speed, and status of 3 aircraft.
 
-#### Time-Series Data
+#### Flight Tracks (Time-Series Data)
 ```bash
-docker exec -i cassandra-1 cqlsh -e "SELECT * FROM flight_analytics.aircraftstates_by_icao24_date LIMIT 5;"
+docker exec -i cassandra-1 cqlsh -e "SELECT * FROM flight_analytics.aircraftstates_by_icao24 LIMIT 5;"
 ```
 
-**What you'll see:** Historical snapshots of aircraft positions over time.
+**What you'll see:** Flight tracks with waypoints showing aircraft trajectories - each flight is identified by icao24 + startTime, with multiple waypoint records showing position changes over time.
 
 #### Traffic Density Heatmap
 ```bash
@@ -434,7 +434,7 @@ To keep the cluster running but delete all records:
 
 ```bash
 docker exec -i cassandra-1 cqlsh -e "TRUNCATE flight_analytics.aircrafts_by_icao24;"
-docker exec -i cassandra-1 cqlsh -e "TRUNCATE flight_analytics.aircraftstates_by_icao24_date;"
+docker exec -i cassandra-1 cqlsh -e "TRUNCATE flight_analytics.aircraftstates_by_icao24;"
 docker exec -i cassandra-1 cqlsh -e "TRUNCATE flight_analytics.aircrafts_by_cell_minute;"
 docker exec -i cassandra-1 cqlsh -e "TRUNCATE flight_analytics.trafficdensity_by_cell_minute;"
 docker exec -i cassandra-1 cqlsh -e "TRUNCATE flight_analytics.activeaircraft_by_country_hour;"
