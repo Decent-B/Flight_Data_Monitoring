@@ -54,21 +54,119 @@ docker run --rm --network docker_flight-network flight-data-spark:latest \
     /opt/spark/bin/spark-submit \
     --master local[*] \
     --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.0,com.datastax.spark:spark-cassandra-connector_2.12:3.4.1 \
+    --exclude-packages com.google.code.findbugs:jsr305 \
     --conf spark.cassandra.connection.host=cassandra-1,cassandra-2,cassandra-3 \
     --conf spark.cassandra.connection.port=9042 \
     --conf spark.cassandra.connection.keepAliveMS=60000 \
     /app/spark_dummy_loader.py
 echo ""
 
-# 8. Verify data was written
-echo "Step 8: Verifying data..."
-echo "Record count in aircrafts_by_icao24:"
-docker exec -i cassandra-1 cqlsh -e "SELECT COUNT(*) FROM flight_analytics.aircrafts_by_icao24;"
-echo ""
-echo "Sample records:"
-docker exec -i cassandra-1 cqlsh -e "SELECT * FROM flight_analytics.aircrafts_by_icao24 LIMIT 3;"
-echo ""
+# 8. Verify data was written to ALL tables
+echo "Step 8: Verifying data integrity across all tables..."
 
-echo "=========================================="
-echo "✓✓✓ End-to-end test complete! ✓✓✓"
-echo "=========================================="
+# Define all tables to check
+TABLES=(
+    "aircrafts_by_icao24"
+    "aircraftstates_by_icao24_date"
+    "aircrafts_by_cell_minute"
+    "trafficdensity_by_cell_minute"
+    "activeaircraft_by_country_hour"
+    "departures_by_country_hour"
+    "arrivals_by_country_hour"
+)
+
+# Function to check a single table
+check_table() {
+    local table=$1
+    echo "---------------------------------------------------"
+    echo "Checking table: $table"
+    
+    # Get the count
+    count=$(docker exec -i cassandra-1 cqlsh -e "SELECT COUNT(*) FROM flight_analytics.$table;" | grep -o '[0-9]\+' | head -n 1)
+    
+    if [ -z "$count" ] || [ "$count" -eq 0 ]; then
+        echo "❌ FAILURE: Table $table is EMPTY."
+        return 1
+    else
+        echo "✓ SUCCESS: Found $count records."
+        # Print a sample to verify schema accessibility
+        echo "  Sample Row:"
+        docker exec -i cassandra-1 cqlsh -e "SELECT * FROM flight_analytics.$table LIMIT 1;" | sed 's/^/    /'
+        return 0
+    fi
+}
+
+# Track failures
+FAILURES=0
+
+# Loop through all tables
+for table in "${TABLES[@]}"; do
+    check_table "$table"
+    if [ $? -ne 0 ]; then
+        FAILURES=$((FAILURES+1))
+    fi
+done
+
+echo ""
+echo "---------------------------------------------------"
+echo "Specific Logic Checks (Data Validity)"
+echo "---------------------------------------------------"
+
+# Check 1: Verify Vietnam (VN) country data exists
+echo "Test 1: Checking for Vietnam (VN) data..."
+vn_count=$(docker exec -i cassandra-1 cqlsh -e "SELECT count(*) FROM flight_analytics.activeaircraft_by_country_hour WHERE country_code='VN' ALLOW FILTERING;" | grep -o '[0-9]\+' | head -n 1)
+
+if [ -z "$vn_count" ] || [ "$vn_count" -eq 0 ]; then
+    echo "❌ FAILURE: No entries found for Country Code 'VN'."
+    FAILURES=$((FAILURES+1))
+else
+    echo "✓ SUCCESS: Found $vn_count entries for Country Code 'VN'."
+fi
+
+# Check 2: Verify traffic density has non-zero aircraft counts
+echo "Test 2: Checking traffic density has valid aircraft counts..."
+density_check=$(docker exec -i cassandra-1 cqlsh -e "SELECT aircraft_count FROM flight_analytics.trafficdensity_by_cell_minute WHERE aircraft_count > 0 LIMIT 1 ALLOW FILTERING;" | grep -o '[0-9]\+' | head -n 1)
+
+if [ -z "$density_check" ]; then
+    echo "❌ FAILURE: No traffic density records with aircraft_count > 0."
+    FAILURES=$((FAILURES+1))
+else
+    echo "✓ SUCCESS: Traffic density records contain valid aircraft counts."
+fi
+
+# Check 3: Verify aircraft states have valid positions
+echo "Test 3: Checking aircraft states have valid latitude/longitude..."
+
+position_check=$(docker exec -i cassandra-1 cqlsh -e "SELECT lat, lon FROM flight_analytics.aircraftstates_by_icao24_date LIMIT 1;" | grep -oE '[0-9]+\.[0-9]+' | head -n 1)
+
+if [ -z "$position_check" ]; then
+    echo "❌ FAILURE: No aircraft states with valid position data."
+    FAILURES=$((FAILURES+1))
+else
+    echo "✓ SUCCESS: Aircraft states contain valid position data."
+fi
+
+# Check 4: Verify departures and arrivals have matching country data
+echo "Test 4: Checking departures/arrivals data consistency..."
+departure_countries=$(docker exec -i cassandra-1 cqlsh -e "SELECT DISTINCT country_code FROM flight_analytics.departures_by_country_hour ALLOW FILTERING;" | grep -oE '[A-Z]{2}' | wc -l)
+arrival_countries=$(docker exec -i cassandra-1 cqlsh -e "SELECT DISTINCT country_code FROM flight_analytics.arrivals_by_country_hour ALLOW FILTERING;" | grep -oE '[A-Z]{2}' | wc -l)
+
+if [ "$departure_countries" -eq 0 ] || [ "$arrival_countries" -eq 0 ]; then
+    echo "❌ FAILURE: Missing departure or arrival country data."
+    FAILURES=$((FAILURES+1))
+else
+    echo "✓ SUCCESS: Found $departure_countries departure countries and $arrival_countries arrival countries."
+fi
+
+echo ""
+if [ $FAILURES -eq 0 ]; then
+    echo "=========================================="
+    echo "✓✓✓ ALL CHECKS PASSED: Data Load Successful ✓✓✓"
+    echo "=========================================="
+    exit 0
+else
+    echo "=========================================="
+    echo "❌ TEST FAILED: $FAILURES check(s) failed."
+    echo "=========================================="
+    exit 1
+fi
