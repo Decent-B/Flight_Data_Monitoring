@@ -188,27 +188,24 @@ print("=" * 80)
 
 # Table 3: aircrafts_by_cell_minute - Aircraft by location and time
 aircrafts_cell_data = []
-for cell in geo_cells:
-    for i in range(NUM_MINUTE_BUCKETS):
-        minute_bucket = current_minute - (i * 60)
-        # sample a few aircraft in that cell
-        for j, aircraft in enumerate(random.sample(aircraft_ids, k=5)):
-            # Unique timestamp for each aircraft to avoid overwriting
-            unique_ts = current_ts - (i * 60) + j
-            aircrafts_cell_data.append((
-                cell,
-                minute_bucket,
-                unique_ts,
-                random.uniform(-80, 80),
-                random.uniform(-180, 180),
-                random.uniform(0, 12000),
-                random.uniform(100, 280),
-                random.uniform(0, 360),
-                aircraft,
-            ))
+for i in range(NUM_MINUTE_BUCKETS):
+    minute_bucket = current_minute - (i * 60)
+    # sample a few aircraft per minute bucket
+    for j, aircraft in enumerate(random.sample(aircraft_ids, k=10)):
+        # Unique timestamp for each aircraft to avoid overwriting
+        unique_ts = current_ts - (i * 60) + j
+        aircrafts_cell_data.append((
+            minute_bucket,
+            unique_ts,
+            random.uniform(-80, 80),
+            random.uniform(-180, 180),
+            random.uniform(0, 12000),
+            random.uniform(100, 280),
+            random.uniform(0, 360),
+            aircraft,
+        ))
 
 aircrafts_cell_schema = StructType([
-    StructField("geo_cell", StringType(), False),
     StructField("minute_bucket", LongType(), False),
     StructField("last_seen_ts", LongType(), True),
     StructField("lat", DoubleType(), True),
@@ -224,32 +221,7 @@ print(f"Generated {aircrafts_cell_df.count()} dummy records")
 
 write_and_preview(aircrafts_cell_df, "aircrafts_by_cell_minute")
 
-print("\n" + "=" * 80)
-print("TABLE 4: trafficdensity_by_cell_minute")
-print("=" * 80)
-
-# Table 4: trafficdensity_by_cell_minute - Aggregated traffic density
-trafficdensity_data = []
-for i in range(NUM_MINUTE_BUCKETS):  # more minute buckets
-    minute_bucket = current_minute - (i * 60)
-    for cell in geo_cells:
-        aircraft_count = 3 + (i % 3)  # Varying counts
-        trafficdensity_data.append((
-            minute_bucket,
-            cell,
-            aircraft_count
-        ))
-
-trafficdensity_schema = StructType([
-    StructField("minute_bucket", LongType(), False),
-    StructField("geo_cell", StringType(), False),
-    StructField("aircraft_count", LongType(), True),
-])
-
-trafficdensity_df = spark.createDataFrame(trafficdensity_data, schema=trafficdensity_schema)
-print(f"Generated {trafficdensity_df.count()} dummy records")
-
-write_and_preview(trafficdensity_df, "trafficdensity_by_cell_minute")
+# Table 4 removed: trafficdensity_by_cell_minute (no longer needed)
 
 print("\n" + "=" * 80)
 print("TABLE 5: activeaircraft_by_country_hour")
@@ -340,7 +312,6 @@ print("\nSuccessfully loaded data into all 7 tables:")
 print("  ✓ aircrafts_by_icao24")
 print("  ✓ aircraftstates_by_icao24")
 print("  ✓ aircrafts_by_cell_minute")
-print("  ✓ trafficdensity_by_cell_minute")
 print("  ✓ activeaircraft_by_country_hour")
 print("  ✓ departures_by_country_hour")
 print("  ✓ arrivals_by_country_hour")

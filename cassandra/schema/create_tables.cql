@@ -32,8 +32,8 @@ CREATE TABLE IF NOT EXISTS aircraftstates_by_icao24 (
     starttime bigint,          -- FlightTrack.startTime (identifies the flight)
     time bigint,               -- Waypoint.time
 
-    latitude double,           -- Waypoint.latitude
-    longitude double,          -- Waypoint.longitude
+    lat double,                -- Waypoint.latitude
+    lon double,                -- Waypoint.longitude
     baro_altitude double,      -- Waypoint.baro_altitude
     true_track double,         -- Waypoint.true_track
     on_ground boolean,         -- Waypoint.on_ground
@@ -47,8 +47,8 @@ CREATE TABLE IF NOT EXISTS aircraftstates_by_icao24 (
 -- Table 3: aircrafts_by_cell_minute
 -- Supports Q1: Live Map by Region & Minute
 -- Stores aircraft positions by geographic cell and time window
+DROP TABLE IF EXISTS aircrafts_by_cell_minute;
 CREATE TABLE IF NOT EXISTS aircrafts_by_cell_minute (
-    geo_cell text,
     minute_bucket bigint,
     icao24 text,
     last_seen_ts bigint,
@@ -57,18 +57,12 @@ CREATE TABLE IF NOT EXISTS aircrafts_by_cell_minute (
     geo_altitude double,
     velocity double,
     true_track double,
-    PRIMARY KEY ((geo_cell, minute_bucket), icao24)
+    PRIMARY KEY ((minute_bucket), icao24)
 );
 
--- Table 4: trafficdensity_by_cell_minute
--- Supports Q4: Density Heatmap per Minute
--- Stores aggregated aircraft counts by geographic cell per minute
-CREATE TABLE IF NOT EXISTS trafficdensity_by_cell_minute (
-    minute_bucket bigint,
-    geo_cell text,
-    aircraft_count bigint,
-    PRIMARY KEY (minute_bucket, geo_cell)
-);
+-- Table 4 removed: trafficdensity_by_cell_minute (no longer needed)
+-- If previously created, ensure it is dropped
+DROP TABLE IF EXISTS trafficdensity_by_cell_minute;
 
 -- Table 5: activeaircraft_by_country_hour
 -- Supports Q5: Hourly Active Aircraft per Country/Global
