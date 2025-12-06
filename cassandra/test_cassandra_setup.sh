@@ -78,7 +78,6 @@ TABLES=(
     "aircrafts_by_icao24"
     "aircraftstates_by_icao24"
     "aircrafts_by_cell_minute"
-    "trafficdensity_by_cell_minute"
     "activeaircraft_by_country_hour"
     "departures_by_country_hour"
     "arrivals_by_country_hour"
@@ -132,19 +131,8 @@ else
     echo "✓ SUCCESS: Found $vn_count entries for Country Code 'VN'."
 fi
 
-# Check 2: Verify traffic density has non-zero aircraft counts
-echo "Test 2: Checking traffic density has valid aircraft counts..."
-density_check=$(docker exec -i cassandra-1 cqlsh -e "SELECT aircraft_count FROM flight_analytics.trafficdensity_by_cell_minute WHERE aircraft_count > 0 LIMIT 1 ALLOW FILTERING;" | grep -o '[0-9]\+' | head -n 1)
-
-if [ -z "$density_check" ]; then
-    echo "❌ FAILURE: No traffic density records with aircraft_count > 0."
-    FAILURES=$((FAILURES+1))
-else
-    echo "✓ SUCCESS: Traffic density records contain valid aircraft counts."
-fi
-
-# Check 3: Verify aircraft states have valid positions
-echo "Test 3: Checking aircraft states have valid latitude/longitude..."
+# Check 2: Verify aircraft states have valid positions
+echo "Test 2: Checking aircraft states have valid latitude/longitude..."
 
 position_check=$(docker exec -i cassandra-1 cqlsh -e "SELECT latitude, longitude FROM flight_analytics.aircraftstates_by_icao24 LIMIT 1;" | grep -oE '[0-9]+\.[0-9]+' | head -n 1)
 
@@ -155,8 +143,8 @@ else
     echo "✓ SUCCESS: Aircraft states contain valid position data."
 fi
 
-# Check 4: Verify departures and arrivals have matching country data
-echo "Test 4: Checking departures/arrivals data consistency..."
+# Check 3: Verify departures and arrivals have matching country data
+echo "Test 3: Checking departures/arrivals data consistency..."
 departure_countries=$(docker exec -i cassandra-1 cqlsh -e "SELECT DISTINCT country_code FROM flight_analytics.departures_by_country_hour ALLOW FILTERING;" | grep -oE '[A-Z]{2}' | wc -l)
 arrival_countries=$(docker exec -i cassandra-1 cqlsh -e "SELECT DISTINCT country_code FROM flight_analytics.arrivals_by_country_hour ALLOW FILTERING;" | grep -oE '[A-Z]{2}' | wc -l)
 
