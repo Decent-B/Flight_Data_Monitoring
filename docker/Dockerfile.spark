@@ -8,7 +8,6 @@ RUN pip install --no-cache-dir confluent-kafka requests python-dateutil
 
 # Copy application code
 COPY src/kafka_reader.py /app/kafka_reader.py
-COPY src/spark_cassandra_test.py /app/spark_cassandra_test.py
 COPY src/spark_dummy_loader.py /app/spark_dummy_loader.py
  
 # Update Kafka bootstrap servers for Docker network - use internal container names
