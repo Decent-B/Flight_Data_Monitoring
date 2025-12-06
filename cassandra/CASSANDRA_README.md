@@ -17,10 +17,24 @@ This is a **complete end-to-end test** of the Cassandra architecture, designed f
 
 Before starting, make sure you have:
 
-- ✅ **Docker Desktop** installed and running
-- ✅ **Git** installed
+- ✅ **WSL 2** installed with **Ubuntu** distribution
+- ✅ **Docker Desktop** installed and running with WSL 2 integration enabled
+- ✅ **Git** installed in your Ubuntu environment
 - ✅ **At least 4GB of free RAM** (for the 3-node cluster)
-- ✅ **PowerShell or Command Prompt** (Windows) or **Terminal** (Mac/Linux)
+
+### Setting Up Docker in WSL
+
+Make sure Docker Desktop has WSL 2 integration enabled:
+1. Open Docker Desktop on Windows
+2. Go to **Settings** → **Resources** → **WSL Integration**
+3. Enable integration with your Ubuntu distribution
+4. Click **Apply & Restart**
+
+Verify Docker works in WSL:
+```bash
+docker --version
+docker-compose --version
+```
 
 No Cassandra installation needed — everything runs in Docker containers!
 
@@ -28,14 +42,20 @@ No Cassandra installation needed — everything runs in Docker containers!
 
 ## Clone & Checkout Branch
 
-### Step 1: Clone the Repository
+### Step 1: Open WSL Terminal and Navigate to Project
 
-Open your terminal and clone the project:
+Open your WSL Ubuntu terminal and navigate to your project directory:
 
 ```bash
-git clone https://github.com/Decent-B/Flight_Data_Monitoring.git
-cd Flight_Data_Monitoring
+# If you already have the project cloned on Windows, access it via /mnt/
+cd "/mnt/d/Giáo trình 20251/IT4043E - Big Data Storage and Processing/Flight_Data_Monitoring"
+
+# Or clone a fresh copy in WSL home directory
+# git clone https://github.com/Decent-B/Flight_Data_Monitoring.git
+# cd Flight_Data_Monitoring
 ```
+
+**Note:** You can access your Windows drives from WSL using `/mnt/c/`, `/mnt/d/`, etc.
 
 ### Step 2: Checkout the Correct Branch
 
@@ -51,15 +71,19 @@ Make sure you have these important files:
 
 ```
 Flight_Data_Monitoring/
+├── cassandra/                      # Cassandra-specific files
+│   ├── CASSANDRA_README.md         # This guide
+│   ├── test_cassandra_setup.sh     # Automated test script
+│   └── schema/
+│       ├── init_keyspace.cql       # Keyspace creation script
+│       └── create_tables.cql       # Table schemas (7 tables)
 ├── docker/
-│   ├── docker-cassandra.yml    # Cassandra cluster definition
-│   ├── docker-spark.yml         # Spark service definition
-│   └── Dockerfile.spark         # Spark container image
-├── schema/
-│   ├── init_keyspace.cql        # Keyspace creation script
-│   └── create_tables.cql        # Table schemas (7 tables)
+│   ├── docker-cassandra.yml        # Cassandra cluster definition
+│   ├── docker-spark.yml            # Spark service definition
+│   ├── Dockerfile.spark            # Spark container image
+│   └── init-cassandra/             # Cassandra initialization scripts
 └── src/
-    └── spark_dummy_loader.py    # Test data generator
+    └── spark_dummy_loader.py       # Test data generator
 ```
 
 If you see old test files like `spark_cassandra_test.py`, you can **ignore or delete them** — we'll use a simpler command-based workflow instead.
@@ -100,6 +124,8 @@ docker-compose -f docker-cassandra.yml up -d
 - `up` starts the services
 - `-d` runs them in the background (detached mode)
 
+**WSL Note:** Docker commands in WSL communicate with Docker Desktop running on Windows. All containers run in the Docker Desktop VM, not directly in WSL.
+
 ### Step 6: Wait for Cluster to Initialize
 
 Cassandra takes time to start up. Wait about **60-90 seconds**, then check the cluster status:
@@ -135,7 +161,7 @@ Return to the project root and run:
 
 ```bash
 cd ..
-docker exec -i cassandra-1 cqlsh < schema/init_keyspace.cql
+docker exec -i cassandra-1 cqlsh < cassandra/schema/init_keyspace.cql
 ```
 
 **What this does:**
@@ -150,7 +176,7 @@ docker exec -i cassandra-1 cqlsh < schema/init_keyspace.cql
 Now create all 7 tables inside the keyspace:
 
 ```bash
-docker exec -i cassandra-1 cqlsh < schema/create_tables.cql
+docker exec -i cassandra-1 cqlsh < cassandra/schema/create_tables.cql
 ```
 
 **What this does:** Creates these tables in the `flight_analytics` keyspace:
@@ -287,7 +313,31 @@ docker exec -i cassandra-1 cqlsh -e "SELECT * FROM flight_analytics.arrivals_by_
 
 ## Full End-to-End Test Script
 
-Want to test everything in one go? Copy and paste this complete sequence:
+Want to test everything in one go? We've created an automated test script that runs all the steps for you.
+
+### Option 1: Run the Automated Test Script (Recommended)
+
+Simply run the test script from the project root:
+
+```bash
+cd "/mnt/d/Giáo trình 20251/IT4043E - Big Data Storage and Processing/Flight_Data_Monitoring"
+./cassandra/test_cassandra_setup.sh
+```
+
+**What it does:**
+- Creates the Docker network
+- Starts the 3-node Cassandra cluster
+- Waits for initialization
+- Creates keyspace and tables
+- Builds Spark image
+- Loads test data
+- Verifies everything works
+
+The script will show progress for each step and confirm when complete.
+
+### Option 2: Manual Commands
+
+If you prefer to run commands manually, here's the complete sequence:
 
 ```bash
 # 1. Create network
@@ -306,8 +356,8 @@ sleep 90
 docker exec cassandra-1 nodetool status
 
 # 5. Create keyspace and tables
-docker exec -i cassandra-1 cqlsh < schema/init_keyspace.cql
-docker exec -i cassandra-1 cqlsh < schema/create_tables.cql
+docker exec -i cassandra-1 cqlsh < cassandra/schema/init_keyspace.cql
+docker exec -i cassandra-1 cqlsh < cassandra/schema/create_tables.cql
 
 # 6. Verify tables exist
 docker exec -i cassandra-1 cqlsh -e "DESCRIBE TABLES;"
@@ -325,7 +375,7 @@ docker exec -i cassandra-1 cqlsh -e "SELECT * FROM flight_analytics.aircrafts_by
 echo "✓ End-to-end test complete!"
 ```
 
-**On Windows PowerShell**, replace `sleep 90` with `Start-Sleep -Seconds 90`.
+**Note:** This script is designed for WSL/Ubuntu bash. The `sleep` command works natively in Ubuntu.
 
 ---
 
@@ -420,6 +470,40 @@ If missing, create it:
 docker network create docker_flight-network
 ```
 
+### Problem: Docker commands not found in WSL
+
+**Solution:** Ensure Docker Desktop integration is enabled for your Ubuntu distribution:
+1. Open Docker Desktop on Windows
+2. Go to **Settings** → **Resources** → **WSL Integration**
+3. Enable your Ubuntu distribution
+4. Restart WSL: Exit terminal and reopen, or run `wsl --shutdown` from Windows PowerShell
+
+### Problem: Permission denied when accessing Windows files
+
+**Solution:** Make sure you have proper permissions on the Windows directory:
+
+```bash
+# Check current permissions
+ls -la "/mnt/d/Giáo trình 20251/IT4043E - Big Data Storage and Processing/Flight_Data_Monitoring"
+
+# If needed, Docker Desktop should handle file permissions automatically
+# Alternatively, consider copying the project to WSL home directory for better performance
+cp -r "/mnt/d/Giáo trình 20251/IT4043E - Big Data Storage and Processing/Flight_Data_Monitoring" ~/
+cd ~/Flight_Data_Monitoring
+```
+
+### Problem: Slow performance when accessing files on /mnt/
+
+**Solution:** For better performance, consider working directly in the WSL filesystem:
+
+```bash
+# Copy project to WSL home directory
+cp -r "/mnt/d/Giáo trình 20251/IT4043E - Big Data Storage and Processing/Flight_Data_Monitoring" ~/
+cd ~/Flight_Data_Monitoring
+```
+
+File operations are significantly faster in the native WSL filesystem (`~/` or `/home/username/`) compared to accessing Windows drives via `/mnt/`.
+
 ### Problem: Spark job fails with "ClassNotFoundException"
 
 **Solution:** Ensure you're using the complete `spark-submit` command with the `--packages` flag that downloads the Cassandra connector.
@@ -464,6 +548,8 @@ After completing this guide, you have:
 - **CQL Reference**: https://cassandra.apache.org/doc/latest/cql/
 - **Spark-Cassandra Connector**: https://github.com/datastax/spark-cassandra-connector
 - **Docker Compose Documentation**: https://docs.docker.com/compose/
+- **WSL Documentation**: https://docs.microsoft.com/en-us/windows/wsl/
+- **Docker Desktop WSL 2 Backend**: https://docs.docker.com/desktop/windows/wsl/
 
 ---
 
