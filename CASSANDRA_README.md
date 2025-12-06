@@ -33,7 +33,7 @@ No Cassandra installation needed — everything runs in Docker containers!
 Open your terminal and clone the project:
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/Decent-B/Flight_Data_Monitoring.git
 cd Flight_Data_Monitoring
 ```
 
@@ -42,7 +42,7 @@ cd Flight_Data_Monitoring
 Switch to the branch that contains the Cassandra setup:
 
 ```bash
-git checkout <cassandra-branch-name>
+git checkout cassandra-setup
 ```
 
 ### Step 3: Verify Project Structure
