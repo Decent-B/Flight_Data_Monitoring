@@ -1,0 +1,28 @@
+server:
+  workers: 1
+coordinator:
+  resources:
+    limits:
+      cpu: 100m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+worker:
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 200m
+      memory: 256Mi
+catalogs:
+  cassandra.properties: |
+    connector.name=cassandra
+    cassandra.contact-points=cassandra.default.svc.cluster.local
+    cassandra.native-protocol-port=9042
+    cassandra.username=cassandra
+    cassandra.password=BZ6nmY2aA4
+
+service:
+  type: NodePort
