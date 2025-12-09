@@ -74,7 +74,7 @@ class FlightDataProducer:
         try:
             response = requests.get(
                 KafkaConfig.OPENSKY_API_URL,
-                timeout=5
+                timeout=30
             )
             response.raise_for_status()
             
