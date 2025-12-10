@@ -18,8 +18,8 @@ class KafkaConfig:
     
     # Topics
     FLIGHTS_RAW_TOPIC = 'flights_raw'
-    FLIGHTS_PROCESSED_TOPIC = 'flights_processed'
-    FLIGHTS_ALERTS_TOPIC = 'flights_alerts'
+    FLIGHTS_DATA_TOPIC = 'flight_data'
+    FLIGHTS_TRACK_TOPIC = 'flight_track'
     
     # Producer Configuration
     PRODUCER_CONFIG: Dict = {

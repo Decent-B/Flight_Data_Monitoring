@@ -75,7 +75,7 @@ class FlightDataConsumer:
             logger.error(f"✗ Failed to subscribe to topics: {e}")
             raise
     
-    def process_message(self, message: Dict) -> Dict:
+    def process_message(self, message: Dict, topic: str) -> Dict:
         """
         Process a single flight message
         Override this method for custom processing logic
@@ -88,22 +88,26 @@ class FlightDataConsumer:
         """
         # Example processing: calculate derived fields
         try:
+            message['_source_topic'] = topic
+
+            if topic == KafkaConfig.FLIGHTS_RAW_TOPIC:
             # Calculate speed in km/h if velocity is available
-            if message['velocity']:
-                message['speed_kmh'] = message['velocity'] * 3.6
+                if message['velocity']:
+                    message['speed_kmh'] = message['velocity'] * 3.6
+                
+                # Add processing timestamp
+                
+                # Classify altitude
+                altitude = message.get('baro_altitude')
+                if altitude is not None:
+                    if altitude < 3000:
+                        message['altitude_category'] = 'low'
+                    elif altitude < 10000:
+                        message['altitude_category'] = 'medium'
+                    else:
+                        message['altitude_category'] = 'high'
             
-            # Add processing timestamp
             message['processing_timestamp'] = int(datetime.utcnow().timestamp())
-            
-            # Classify altitude
-            altitude = message.get('baro_altitude')
-            if altitude is not None:
-                if altitude < 3000:
-                    message['altitude_category'] = 'low'
-                elif altitude < 10000:
-                    message['altitude_category'] = 'medium'
-                else:
-                    message['altitude_category'] = 'high'
             
             return message
             
@@ -151,7 +155,7 @@ class FlightDataConsumer:
                 try:
                     # Deserialize message
                     key = msg.key().decode('utf-8') if msg.key() else None
-                    value = json.loads(msg.value().decode('utf-8'))[0]
+                    value = json.loads(msg.value().decode('utf-8'))
                     
                     self.messages_consumed += 1
                     
@@ -163,7 +167,7 @@ class FlightDataConsumer:
                         )
                     
                     # Process message
-                    processed_msg = self.process_message(value)
+                    processed_msg = self.process_message(value, msg.topic())
                     processed_msg['_metadata'] = {
                         'topic': msg.topic(),
                         'partition': msg.partition(),
@@ -339,16 +343,22 @@ class FlightDataConsumer:
 def message_callback(message: Dict) -> None:
     """Example callback function for processing messages"""
     logger.info(
-        f"Callback - Flight {message.get('callsign', 'N/A')} at "
-        f"({message.get('latitude'):.2f}, {message.get('longitude'):.2f})"
+        f"Callback - Key {message['_metadata'].get('key', 'N/A')}, topic: {message['_metadata']['topic']}, "
     )
 
 
 def main():
     """Main function to run the consumer"""
     # Create consumer with custom group ID
+    topics = [
+        KafkaConfig.FLIGHTS_RAW_TOPIC,
+        KafkaConfig.FLIGHTS_DATA_TOPIC,
+        KafkaConfig.FLIGHTS_TRACK_TOPIC
+    ]
+
     consumer = FlightDataConsumer(
-        group_id='flight-processors-1'
+        group_id='flight-processors-1',
+        topics=topics
     )
     
     try:
