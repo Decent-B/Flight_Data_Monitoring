@@ -211,3 +211,4 @@ apache_spark
 draft.py
 draft2.py
 raw_data/
+docker/.env

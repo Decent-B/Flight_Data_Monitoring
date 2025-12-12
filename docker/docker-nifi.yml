@@ -5,6 +5,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.nifi
+      args:
+        NIFI_USERNAME: ${NIFI_SINGLE_USER_USERNAME}
+        NIFI_PASSWORD: ${NIFI_SINGLE_USER_PASSWORD}
     image: custom-nifi-secure
     container_name: project_nifi
     restart: unless-stopped
@@ -13,8 +16,8 @@ services:
       - "8443:8443"
     environment:
       # Force NiFi to listen on HTTPS (default for many NiFi images)
-      - SINGLE_USER_CREDENTIALS_USERNAME=admin
-      - SINGLE_USER_CREDENTIALS_PASSWORD=Utlinhsaygex123.
+      - SINGLE_USER_CREDENTIALS_USERNAME=${NIFI_SINGLE_USER_USERNAME}
+      - SINGLE_USER_CREDENTIALS_PASSWORD=${NIFI_SINGLE_USER_PASSWORD}
       - NIFI_WEB_HTTPS_HOST=nifi
       - NIFI_WEB_HTTPS_PORT=8443
       # Ensure HTTP is not implicitly enabled
@@ -80,8 +83,8 @@ services:
     environment:
       - NIFI_API_URL=https://nifi:8443
       - REGISTRY_API_URL=http://nifi-registry:18080
-      - NIFI_USERNAME=admin
-      - NIFI_PASSWORD=Utlinhsaygex123.
+      - NIFI_USERNAME=${NIFI_SINGLE_USER_USERNAME}
+      - NIFI_PASSWORD=${NIFI_SINGLE_USER_PASSWORD}
       # Set to "true" if you want to ignore self-signed cert issues (dev only)
       - INSECURE_SKIP_TLS_VERIFY=true
     entrypoint:
