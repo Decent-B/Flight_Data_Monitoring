@@ -30,6 +30,7 @@ services:
       - nifi_database_repo:/opt/nifi/nifi-current/database_repository
       - nifi_logs:/opt/nifi/nifi-current/logs
       - nifi_state:/opt/nifi/nifi-current/state
+      - ../nifi/api_params:/opt/nifi/nifi-data/config
 
     # Robust healthcheck: uses HTTPS, accepts self-signed certs, waits a bit before starting checks
     healthcheck:

@@ -31,7 +31,7 @@ def load_json(filename):
       data = json.load(f)
     return data
 
-def process_data(input_filename, output_filename):
+def save_data(input_filename, output_filename):
   data = load_json(input_filename)
   items_list = []
   for obj in data:
@@ -39,3 +39,16 @@ def process_data(input_filename, output_filename):
   with open(output_filename, 'w') as f:
     json.dump(items_list, f, indent=2)
   print(f"Processed {len(items_list)} items and saved to '{output_filename}'")
+
+def process_data(input_filename, output_filename):
+  data = load_json(input_filename)
+  processed_data = []
+  for item in data:
+    for key, value in item.items():
+      if isinstance(value, str):
+        value = value.strip()
+      item[key] = value
+    processed_data.append(item)
+  with open(output_filename, 'w') as f:
+    json.dump(processed_data, f, indent=2)
+  print(f"Processed {input_filename} data saved to '{output_filename}'")

@@ -353,7 +353,10 @@ def main():
     topics = [
         KafkaConfig.FLIGHTS_RAW_TOPIC,
         KafkaConfig.FLIGHTS_DATA_TOPIC,
-        KafkaConfig.FLIGHTS_TRACK_TOPIC
+        KafkaConfig.FLIGHTS_TRACK_TOPIC,
+        KafkaConfig.CURRENT_WEATHER_TOPIC,
+        KafkaConfig.FUTURE_WEATHER_TOPIC,
+        KafkaConfig.WEATHER_WARNING_TOPIC
     ]
 
     consumer = FlightDataConsumer(

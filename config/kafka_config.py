@@ -20,6 +20,9 @@ class KafkaConfig:
     FLIGHTS_RAW_TOPIC = 'flights_raw'
     FLIGHTS_DATA_TOPIC = 'flight_data'
     FLIGHTS_TRACK_TOPIC = 'flight_track'
+    CURRENT_WEATHER_TOPIC = 'current_airport_weather'
+    FUTURE_WEATHER_TOPIC = 'future_airport_weather'
+    WEATHER_WARNING_TOPIC = 'weather_warnings'
     
     # Producer Configuration
     PRODUCER_CONFIG: Dict = {

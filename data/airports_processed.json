@@ -10620,7 +10620,7 @@
     "longitude": "-74.143135",
     "airport_name": "El Nuevo Dorado International",
     "country_name": "Colombia",
-    "phone_number": " +57(0)91 425 1000",
+    "phone_number": "+57(0)91 425 1000",
     "timezone": "America/Bogota"
   },
   {
@@ -10731,7 +10731,7 @@
     "latitude": "12.133403",
     "longitude": "-68.27687",
     "airport_name": "Flamingo International",
-    "country_name": "Bonaire, Saint Eustatius and Saba ",
+    "country_name": "Bonaire, Saint Eustatius and Saba",
     "phone_number": null,
     "timezone": "America/Kralendijk"
   },
@@ -11738,7 +11738,7 @@
     "geoname_id": "6999872",
     "latitude": "30.555555",
     "longitude": "47.79139",
-    "airport_name": "Basrah International Airport ",
+    "airport_name": "Basrah International Airport",
     "country_name": "Iraq",
     "phone_number": null,
     "timezone": "Asia/Baghdad"
@@ -19658,7 +19658,7 @@
     "geoname_id": "5332698",
     "latitude": "32.666668",
     "longitude": "-115.51667",
-    "airport_name": "Calexico International Airport ",
+    "airport_name": "Calexico International Airport",
     "country_name": "United States",
     "phone_number": null,
     "timezone": "America/Los_Angeles"
@@ -23372,7 +23372,7 @@
     "longitude": "55.352917",
     "airport_name": "Dubai",
     "country_name": "United Arab Emirates",
-    "phone_number": " +971 4 224 5555",
+    "phone_number": "+971 4 224 5555",
     "timezone": "Asia/Dubai"
   },
   {
@@ -25963,7 +25963,7 @@
     "latitude": "17.493055",
     "longitude": "-62.97778",
     "airport_name": "F D Roosevelt",
-    "country_name": "Bonaire, Saint Eustatius and Saba ",
+    "country_name": "Bonaire, Saint Eustatius and Saba",
     "phone_number": null,
     "timezone": "America/Kralendijk"
   },
@@ -76011,7 +76011,7 @@
     "latitude": "17.65",
     "longitude": "-63.216667",
     "airport_name": "J. Yrausquin",
-    "country_name": "Bonaire, Saint Eustatius and Saba ",
+    "country_name": "Bonaire, Saint Eustatius and Saba",
     "phone_number": null,
     "timezone": "America/Kralendijk"
   },
@@ -103578,7 +103578,7 @@
     "geoname_id": "8520859",
     "latitude": "32.482498",
     "longitude": "130.158997",
-    "airport_name": "Amakusa Airfield\r\n",
+    "airport_name": "Amakusa Airfield",
     "country_name": "Japan",
     "phone_number": null,
     "timezone": null
@@ -103594,7 +103594,7 @@
     "geoname_id": "8533832",
     "latitude": "-27.405633",
     "longitude": "141.809458",
-    "airport_name": "Ballera Airport\r\n",
+    "airport_name": "Ballera Airport",
     "country_name": "Australia",
     "phone_number": null,
     "timezone": null
@@ -103610,7 +103610,7 @@
     "geoname_id": "8426217",
     "latitude": "27.267066",
     "longitude": "105.472097",
-    "airport_name": "Bijie Feixiong AirportYCV\r\n",
+    "airport_name": "Bijie Feixiong AirportYCV",
     "country_name": "China",
     "phone_number": null,
     "timezone": null
@@ -103642,7 +103642,7 @@
     "geoname_id": "7668668",
     "latitude": "-1.2682700157",
     "longitude": "116.893997192",
-    "airport_name": "Sultan Aji Muhamad Sulaiman Airport\r\n",
+    "airport_name": "Sultan Aji Muhamad Sulaiman Airport",
     "country_name": "Indonesia",
     "phone_number": null,
     "timezone": null
@@ -103658,7 +103658,7 @@
     "geoname_id": "8531844",
     "latitude": "27.5622",
     "longitude": "90.7471",
-    "airport_name": "Bathpalathang Airport\r\n",
+    "airport_name": "Bathpalathang Airport",
     "country_name": "Bhutan",
     "phone_number": null,
     "timezone": null
@@ -103674,7 +103674,7 @@
     "geoname_id": "11951798",
     "latitude": "-1.1278",
     "longitude": "102.135",
-    "airport_name": "Muara Bungo Airport\r\n",
+    "airport_name": "Muara Bungo Airport",
     "country_name": "Indonesia",
     "phone_number": null,
     "timezone": null
@@ -103706,7 +103706,7 @@
     "geoname_id": "8531789",
     "latitude": "-8.31015",
     "longitude": "114.3401",
-    "airport_name": "Blimbingsari Airport\r\n",
+    "airport_name": "Blimbingsari Airport",
     "country_name": "Indonesia",
     "phone_number": null,
     "timezone": null
@@ -103722,7 +103722,7 @@
     "geoname_id": "8555592",
     "latitude": "-22.6739006042",
     "longitude": "119.1660003662",
-    "airport_name": "Barimunya Airport\r\n",
+    "airport_name": "Barimunya Airport",
     "country_name": "Australia",
     "phone_number": null,
     "timezone": null
@@ -103754,7 +103754,7 @@
     "geoname_id": "8520847",
     "latitude": "22.4610004425",
     "longitude": "-78.3283996582",
-    "airport_name": "Jardines Del Rey Airport\r\n",
+    "airport_name": "Jardines Del Rey Airport",
     "country_name": "Cuba",
     "phone_number": null,
     "timezone": null
@@ -103770,7 +103770,7 @@
     "geoname_id": "8555599",
     "latitude": "-22.9666996002",
     "longitude": "118.81300354",
-    "airport_name": "Coondewanna Airport\r\n",
+    "airport_name": "Coondewanna Airport",
     "country_name": "Australia",
     "phone_number": null,
     "timezone": null
@@ -103786,7 +103786,7 @@
     "geoname_id": "6452899",
     "latitude": "38.8563888889",
     "longitude": "-3.97",
-    "airport_name": "Ciudad Real Central Airport\r\n",
+    "airport_name": "Ciudad Real Central Airport",
     "country_name": "Spain",
     "phone_number": null,
     "timezone": null
@@ -103802,8 +103802,8 @@
     "geoname_id": "4188990",
     "latitude": "32.5163002014",
     "longitude": "-84.9389038086",
-    "airport_name": "Columbus Metropolitan Airport\r\n",
-    "country_name": "United States\r\n",
+    "airport_name": "Columbus Metropolitan Airport",
+    "country_name": "United States",
     "phone_number": null,
     "timezone": null
   },
@@ -103818,7 +103818,7 @@
     "geoname_id": "11184550",
     "latitude": "23.273889",
     "longitude": "99.373611",
-    "airport_name": "Cangyuan Washan Airport\r\n",
+    "airport_name": "Cangyuan Washan Airport",
     "country_name": "China",
     "phone_number": null,
     "timezone": null
@@ -103834,7 +103834,7 @@
     "geoname_id": "11101506",
     "latitude": "45.505278",
     "longitude": "123.019722",
-    "airport_name": "Baicheng Chang'an Airport\r\n",
+    "airport_name": "Baicheng Chang'an Airport",
     "country_name": "China",
     "phone_number": null,
     "timezone": null
@@ -103882,7 +103882,7 @@
     "geoname_id": null,
     "latitude": "-4.8557",
     "longitude": "139.482006",
-    "airport_name": "Nop Goliat Airport\r\n",
+    "airport_name": "Nop Goliat Airport",
     "country_name": "Indonesia",
     "phone_number": null,
     "timezone": null
@@ -103914,7 +103914,7 @@
     "geoname_id": "8394117",
     "latitude": "19.501944",
     "longitude": "57.634167",
-    "airport_name": "Duqm International Airport\r\n",
+    "airport_name": "Duqm International Airport",
     "country_name": "Oman",
     "phone_number": null,
     "timezone": null
@@ -103930,7 +103930,7 @@
     "geoname_id": "7732976",
     "latitude": "14.67",
     "longitude": "-17.073333",
-    "airport_name": "Blaise Diagne International Airport\r\n",
+    "airport_name": "Blaise Diagne International Airport",
     "country_name": "Senegal",
     "phone_number": null,
     "timezone": null
@@ -103946,7 +103946,7 @@
     "geoname_id": "8531809",
     "latitude": "2.25973",
     "longitude": "98.991898",
-    "airport_name": "Silangit Airport\r\n",
+    "airport_name": "Silangit Airport",
     "country_name": "Indonesia",
     "phone_number": null,
     "timezone": null
@@ -103962,7 +103962,7 @@
     "geoname_id": "11128430",
     "latitude": "48.445",
     "longitude": "126.133",
-    "airport_name": "Wudalianchi Dedu Airport\r\n",
+    "airport_name": "Wudalianchi Dedu Airport",
     "country_name": "China",
     "phone_number": null,
     "timezone": null
@@ -103979,7 +103979,7 @@
     "latitude": null,
     "longitude": null,
     "airport_name": "Bruce Campbell Field",
-    "country_name": "United States\r\n",
+    "country_name": "United States",
     "phone_number": null,
     "timezone": null
   },
@@ -103994,7 +103994,7 @@
     "geoname_id": null,
     "latitude": "30.3974931",
     "longitude": "-97.5663935",
-    "airport_name": "Austin Executive Airport ",
+    "airport_name": "Austin Executive Airport",
     "country_name": "United States",
     "phone_number": null,
     "timezone": null
@@ -104010,7 +104010,7 @@
     "geoname_id": "11153003",
     "latitude": "29.723694",
     "longitude": "35.011416",
-    "airport_name": "Ramon Airport\r\n",
+    "airport_name": "Ramon Airport",
     "country_name": "Israel",
     "phone_number": null,
     "timezone": null
@@ -104021,13 +104021,13 @@
     "airport_id": "10373",
     "iata_code": "FLZ",
     "city_iata_code": null,
-    "icao_code": "WIMS\r\n",
+    "icao_code": "WIMS",
     "country_iso2": "ID",
     "geoname_id": "6301238",
     "latitude": "1.55594",
     "longitude": "98.888901",
-    "airport_name": "Dr Ferdinand Lumban Tobing Airport\r\n",
-    "country_name": "Indonesia\r\n",
+    "airport_name": "Dr Ferdinand Lumban Tobing Airport",
+    "country_name": "Indonesia",
     "phone_number": null,
     "timezone": null
   },
@@ -104037,12 +104037,12 @@
     "airport_id": "10374",
     "iata_code": "FND",
     "city_iata_code": null,
-    "icao_code": "-",
+    "icao_code": "VRCF",
     "country_iso2": "MV",
     "geoname_id": "12104814",
     "latitude": "6.1611",
     "longitude": "73.2872",
-    "airport_name": "Funadhoo Airport\r\n",
+    "airport_name": "Funadhoo Airport",
     "country_name": "Maldives",
     "phone_number": null,
     "timezone": null
@@ -104058,7 +104058,7 @@
     "geoname_id": null,
     "latitude": "52.040333",
     "longitude": "11.202833",
-    "airport_name": "Rhein-Main AFB airport\r\n",
+    "airport_name": "Rhein-Main AFB airport",
     "country_name": "Germany",
     "phone_number": null,
     "timezone": null
@@ -104074,7 +104074,7 @@
     "geoname_id": "11127692",
     "latitude": "46.804169",
     "longitude": "89.512006",
-    "airport_name": "Fuyun Koktokay Airport\r\n",
+    "airport_name": "Fuyun Koktokay Airport",
     "country_name": "China",
     "phone_number": null,
     "timezone": null
@@ -104122,7 +104122,7 @@
     "geoname_id": "12105153",
     "latitude": "-14.02531",
     "longitude": "-52.15432",
-    "airport_name": "\u00c1gua Boa Airport\r\n",
+    "airport_name": "\u00c1gua Boa Airport",
     "country_name": "Brazil",
     "phone_number": null,
     "timezone": null
@@ -104219,7 +104219,7 @@
     "latitude": "44.05562",
     "longitude": "-75.71946",
     "airport_name": "Wheeler-Sack Army Airfield",
-    "country_name": "United States\r\n",
+    "country_name": "United States",
     "phone_number": null,
     "timezone": null
   },
@@ -104235,7 +104235,7 @@
     "latitude": "30.169167",
     "longitude": "-96.98",
     "airport_name": "Giddings\u2013Lee County Airport",
-    "country_name": "United States\r\n",
+    "country_name": "United States",
     "phone_number": null,
     "timezone": null
   },
@@ -104250,7 +104250,7 @@
     "geoname_id": "12110485",
     "latitude": "-28.01838",
     "longitude": "123.80329",
-    "airport_name": " Gruyere Mine Airport",
+    "airport_name": "Gruyere Mine Airport",
     "country_name": "Australia",
     "phone_number": null,
     "timezone": null
@@ -104410,7 +104410,7 @@
     "geoname_id": "8532010",
     "latitude": "42.58792",
     "longitude": "76.713046",
-    "airport_name": "Issyk-Kul International Airport\r\n",
+    "airport_name": "Issyk-Kul International Airport",
     "country_name": "Kyrgyzstan",
     "phone_number": null,
     "timezone": null
@@ -104442,7 +104442,7 @@
     "geoname_id": "6676732",
     "latitude": "39.1925",
     "longitude": "44.925278",
-    "airport_name": "Maku International Airport\r\n\r\n",
+    "airport_name": "Maku International Airport",
     "country_name": "Iran",
     "phone_number": null,
     "timezone": null
@@ -104731,7 +104731,7 @@
     "latitude": "-3.28",
     "longitude": "102.917222",
     "airport_name": "Silampari Airport",
-    "country_name": "Indonesia\r\n",
+    "country_name": "Indonesia",
     "phone_number": null,
     "timezone": null
   },
@@ -104747,7 +104747,7 @@
     "latitude": "-3.084722",
     "longitude": "120.245278",
     "airport_name": "Bua Airport",
-    "country_name": "Indonesia\r\n",
+    "country_name": "Indonesia",
     "phone_number": null,
     "timezone": null
   },
@@ -104779,7 +104779,7 @@
     "latitude": "2.964167",
     "longitude": "105.754444",
     "airport_name": "Letung Airport",
-    "country_name": "Indonesia\r\n",
+    "country_name": "Indonesia",
     "phone_number": null,
     "timezone": null
   },
@@ -104811,7 +104811,7 @@
     "latitude": "3.575278",
     "longitude": "116.619722",
     "airport_name": "Robert Atty Bessing Airport",
-    "country_name": "Indonesia\r\n",
+    "country_name": "Indonesia",
     "phone_number": null,
     "timezone": null
   },
@@ -104843,7 +104843,7 @@
     "latitude": "-2.203333",
     "longitude": "121.660278",
     "airport_name": "Maleo Airport",
-    "country_name": "Indonesia\r\n",
+    "country_name": "Indonesia",
     "phone_number": null,
     "timezone": null
   },
@@ -104859,7 +104859,7 @@
     "latitude": "21.4505004",
     "longitude": "-157.768",
     "airport_name": "Kaneohe Bay MCAS (Marion E. Carl Field) Airport",
-    "country_name": "United States\r\n",
+    "country_name": "United States",
     "phone_number": null,
     "timezone": null
   },
@@ -105018,7 +105018,7 @@
     "geoname_id": "11951800",
     "latitude": "-0.864417",
     "longitude": "121.623083",
-    "airport_name": "Tanjung Api Airport ",
+    "airport_name": "Tanjung Api Airport",
     "country_name": "Indonesia",
     "phone_number": null,
     "timezone": null
@@ -105083,7 +105083,7 @@
     "latitude": "45.56",
     "longitude": "-93.608333",
     "airport_name": "Princeton Municipal Airport",
-    "country_name": "United States\r\n",
+    "country_name": "United States",
     "phone_number": null,
     "timezone": null
   },
@@ -105099,7 +105099,7 @@
     "latitude": "42.79550171",
     "longitude": "-109.8069992",
     "airport_name": "Ralph Wenz Field",
-    "country_name": "United States\r\n",
+    "country_name": "United States",
     "phone_number": null,
     "timezone": null
   },
@@ -105402,7 +105402,7 @@
     "geoname_id": null,
     "latitude": "45.145",
     "longitude": "-93.210278",
-    "airport_name": "Anoka County\u2013Blaine Airport ",
+    "airport_name": "Anoka County\u2013Blaine Airport",
     "country_name": "United States",
     "phone_number": null,
     "timezone": null
@@ -105594,7 +105594,7 @@
     "geoname_id": "11669752",
     "latitude": "38.245",
     "longitude": "77.06",
-    "airport_name": "Shache Airport ",
+    "airport_name": "Shache Airport",
     "country_name": "China",
     "phone_number": null,
     "timezone": null
@@ -105834,7 +105834,7 @@
     "geoname_id": "5009005",
     "latitude": "46.479167",
     "longitude": "-84.368333",
-    "airport_name": "Sault Ste. Marie Municipal Airport ",
+    "airport_name": "Sault Ste. Marie Municipal Airport",
     "country_name": "United States",
     "phone_number": null,
     "timezone": null
@@ -105866,7 +105866,7 @@
     "geoname_id": "8643372",
     "latitude": "-20.75306",
     "longitude": "-51.682",
-    "airport_name": "Pl\u00ednio Alarcom Airport\r\n",
+    "airport_name": "Pl\u00ednio Alarcom Airport",
     "country_name": "Brazil",
     "phone_number": null,
     "timezone": null
@@ -105962,7 +105962,7 @@
     "geoname_id": "4921871",
     "latitude": "40.030556",
     "longitude": "-86.251389",
-    "airport_name": "Indianapolis Executive Airport ",
+    "airport_name": "Indianapolis Executive Airport",
     "country_name": "United States",
     "phone_number": null,
     "timezone": null
@@ -105995,7 +105995,7 @@
     "latitude": "35.387778",
     "longitude": "-80.709167",
     "airport_name": "Concord-Padgett Regional Airport",
-    "country_name": "United States\r\n",
+    "country_name": "United States",
     "phone_number": null,
     "timezone": null
   },
@@ -106042,7 +106042,7 @@
     "geoname_id": "8556009",
     "latitude": "-26.809167",
     "longitude": "150.165",
-    "airport_name": "Miles Airport\r\n\r\n",
+    "airport_name": "Miles Airport",
     "country_name": "Australia",
     "phone_number": null,
     "timezone": null
@@ -106074,7 +106074,7 @@
     "geoname_id": "11608591",
     "latitude": "27.81638",
     "longitude": "106.33268",
-    "airport_name": "Zunyi Maotai Airport\r\n",
+    "airport_name": "Zunyi Maotai Airport",
     "country_name": "China",
     "phone_number": null,
     "timezone": null
@@ -106090,7 +106090,7 @@
     "geoname_id": "11789255",
     "latitude": "-5.316667",
     "longitude": "123.583333",
-    "airport_name": "Matahora Airport\r\n",
+    "airport_name": "Matahora Airport",
     "country_name": "Indonesia",
     "phone_number": null,
     "timezone": null
@@ -106106,7 +106106,7 @@
     "geoname_id": "9034837",
     "latitude": "53.745098",
     "longitude": "-2.88306",
-    "airport_name": "Warton Airport\r\n",
+    "airport_name": "Warton Airport",
     "country_name": "United Kingdom",
     "phone_number": null,
     "timezone": null
@@ -106138,7 +106138,7 @@
     "geoname_id": "9881357",
     "latitude": "-27.558332",
     "longitude": "151.793335",
-    "airport_name": "Toowoomba Wellcamp Airport\r\n",
+    "airport_name": "Toowoomba Wellcamp Airport",
     "country_name": "Australia",
     "phone_number": null,
     "timezone": null
@@ -106154,7 +106154,7 @@
     "geoname_id": "11102730",
     "latitude": "38.597456",
     "longitude": "112.969173",
-    "airport_name": "Xinzhou Wutaishan Airport\r\n",
+    "airport_name": "Xinzhou Wutaishan Airport",
     "country_name": "China",
     "phone_number": null,
     "timezone": null
@@ -106250,7 +106250,7 @@
     "geoname_id": "11102736",
     "latitude": "40.542524",
     "longitude": "122.3586",
-    "airport_name": "Yingkou Lanqi Airport\r\n",
+    "airport_name": "Yingkou Lanqi Airport",
     "country_name": "China",
     "phone_number": null,
     "timezone": null
@@ -106266,7 +106266,7 @@
     "geoname_id": "8593887",
     "latitude": "37.5497",
     "longitude": "44.2381",
-    "airport_name": "Hakkari Y\u00fcksekova Airport\r\n",
+    "airport_name": "Hakkari Y\u00fcksekova Airport",
     "country_name": "Turkey",
     "phone_number": null,
     "timezone": null
@@ -106282,7 +106282,7 @@
     "geoname_id": "8411020",
     "latitude": "27.2563889",
     "longitude": "91.5144444",
-    "airport_name": "Yongphulla Airport\r\n",
+    "airport_name": "Yongphulla Airport",
     "country_name": "Bhutan",
     "phone_number": null,
     "timezone": null
@@ -106346,7 +106346,7 @@
     "geoname_id": null,
     "latitude": "31.774878",
     "longitude": "12.25006",
-    "airport_name": "Alzintan Airport\r\n",
+    "airport_name": "Alzintan Airport",
     "country_name": "Libya",
     "phone_number": null,
     "timezone": null
@@ -106426,7 +106426,7 @@
     "geoname_id": null,
     "latitude": "48.199494",
     "longitude": "134.366447",
-    "airport_name": "Dongji Aiport\r\n",
+    "airport_name": "Dongji Aiport",
     "country_name": "China",
     "phone_number": null,
     "timezone": null
@@ -106458,7 +106458,7 @@
     "geoname_id": "8521364",
     "latitude": "34.8105",
     "longitude": "102.6447",
-    "airport_name": "Gannan Xiahe Airport\r\n",
+    "airport_name": "Gannan Xiahe Airport",
     "country_name": "China",
     "phone_number": null,
     "timezone": null
@@ -106474,7 +106474,7 @@
     "geoname_id": null,
     "latitude": "24.805",
     "longitude": "107.6997",
-    "airport_name": "Hechi Jinchengjiang Airport\r\n",
+    "airport_name": "Hechi Jinchengjiang Airport",
     "country_name": "China",
     "phone_number": null,
     "timezone": null
@@ -106506,7 +106506,7 @@
     "geoname_id": "11126251",
     "latitude": "-15.957725",
     "longitude": "-5.645943",
-    "airport_name": "St. Helena Airport\r\n",
+    "airport_name": "St. Helena Airport",
     "country_name": "United Kingdom",
     "phone_number": null,
     "timezone": null
@@ -106538,7 +106538,7 @@
     "geoname_id": "8594743",
     "latitude": "31.626",
     "longitude": "110.34",
-    "airport_name": "Shennongjia Hongping Airport\r\n",
+    "airport_name": "Shennongjia Hongping Airport",
     "country_name": "China",
     "phone_number": null,
     "timezone": null
@@ -106554,7 +106554,7 @@
     "geoname_id": "11185240",
     "latitude": "45.487222",
     "longitude": "119.407222",
-    "airport_name": "Holingol Huolinhe Airport\r\n",
+    "airport_name": "Holingol Huolinhe Airport",
     "country_name": "China",
     "phone_number": null,
     "timezone": null
@@ -106586,7 +106586,7 @@
     "geoname_id": "10943305",
     "latitude": "5.7083",
     "longitude": "73.025",
-    "airport_name": "Ifuru Airport\r\n",
+    "airport_name": "Ifuru Airport",
     "country_name": "Maldives",
     "phone_number": null,
     "timezone": null
@@ -106602,7 +106602,7 @@
     "geoname_id": null,
     "latitude": "-2.186667",
     "longitude": "-56.090278",
-    "airport_name": "Juruti Airport ",
+    "airport_name": "Juruti Airport",
     "country_name": "Brazil",
     "phone_number": null,
     "timezone": null
@@ -106618,7 +106618,7 @@
     "geoname_id": null,
     "latitude": "-24.164722",
     "longitude": "-46.785556",
-    "airport_name": "Ant\u00f4nio Ribeiro Nogueira Jr. State Airport ",
+    "airport_name": "Ant\u00f4nio Ribeiro Nogueira Jr. State Airport",
     "country_name": "Brazil",
     "phone_number": null,
     "timezone": null
@@ -106650,7 +106650,7 @@
     "geoname_id": "7668209",
     "latitude": "51.2136001587",
     "longitude": "0.1386110038",
-    "airport_name": "Redhill Aerodrome\r\n",
+    "airport_name": "Redhill Aerodrome",
     "country_name": "United Kingdom",
     "phone_number": null,
     "timezone": null
@@ -106698,7 +106698,7 @@
     "geoname_id": null,
     "latitude": "27.925",
     "longitude": "35.29",
-    "airport_name": "Neom Bay Airport\u00a0",
+    "airport_name": "Neom Bay Airport",
     "country_name": "Saudi Arabia",
     "phone_number": null,
     "timezone": null
@@ -106714,8 +106714,8 @@
     "geoname_id": "5074379",
     "latitude": "41.1183013916",
     "longitude": "-95.9124984741",
-    "airport_name": "Offutt Air Force Base\r\n",
-    "country_name": "United States\r\n",
+    "airport_name": "Offutt Air Force Base",
+    "country_name": "United States",
     "phone_number": null,
     "timezone": null
   },
@@ -106746,7 +106746,7 @@
     "geoname_id": "4304231",
     "latitude": "37.5617981",
     "longitude": "-82.56639862",
-    "airport_name": "Pike County-Hatcher Field\r\n",
+    "airport_name": "Pike County-Hatcher Field",
     "country_name": "United States",
     "phone_number": null,
     "timezone": null
@@ -106954,7 +106954,7 @@
     "geoname_id": "760772",
     "latitude": "51.3891983032",
     "longitude": "21.213300705",
-    "airport_name": "Radom Airport\r\n",
+    "airport_name": "Radom Airport",
     "country_name": "Poland",
     "phone_number": null,
     "timezone": null
@@ -106970,7 +106970,7 @@
     "geoname_id": null,
     "latitude": "38.974722",
     "longitude": "88.008333",
-    "airport_name": "Ruoqiang Loulan Airport\u00a0",
+    "airport_name": "Ruoqiang Loulan Airport",
     "country_name": "China",
     "phone_number": null,
     "timezone": null
@@ -107018,7 +107018,7 @@
     "geoname_id": "6297332",
     "latitude": "32.6635017395",
     "longitude": "13.1590003967",
-    "airport_name": "Tripoli International Airport\r\n",
+    "airport_name": "Tripoli International Airport",
     "country_name": "Libya",
     "phone_number": null,
     "timezone": null
@@ -107082,7 +107082,7 @@
     "geoname_id": "6301531",
     "latitude": "52.1273002625",
     "longitude": "5.2761898041",
-    "airport_name": "Soesterberg Air Base\r\n",
+    "airport_name": "Soesterberg Air Base",
     "country_name": "Netherlands",
     "phone_number": null,
     "timezone": null
@@ -107226,7 +107226,7 @@
     "geoname_id": null,
     "latitude": "-29.945556",
     "longitude": "-51.143611",
-    "airport_name": "Nossa Senhora de F\u00e1tima Aerodrome ",
+    "airport_name": "Nossa Senhora de F\u00e1tima Aerodrome",
     "country_name": "Brazil",
     "phone_number": null,
     "timezone": "America/Sao_Paulo"
