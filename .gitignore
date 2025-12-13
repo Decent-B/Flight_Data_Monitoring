@@ -212,3 +212,4 @@ draft.py
 draft2.py
 raw_data/
 docker/.env
+src/opensky_auth.py

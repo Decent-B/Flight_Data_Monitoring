@@ -474,7 +474,7 @@ def main():
                 new_pg = pg
 
             print("Scheduling (starting) process group:", new_pg.id)
-            # canvas.schedule_process_group(new_pg.id, True)
+            canvas.schedule_process_group(new_pg.id, True)
             print("Process group scheduled. Done.")
 
     except Exception as e:
