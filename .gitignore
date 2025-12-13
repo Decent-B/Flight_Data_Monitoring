@@ -207,6 +207,9 @@ marimo/_lsp/
 __marimo__/
 
 # Folders
-spark/
-
-*.json
+spark
+draft.py
+draft2.py
+airports.json
+flights.json
+user_data.json

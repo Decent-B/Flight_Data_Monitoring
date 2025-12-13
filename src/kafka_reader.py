@@ -55,6 +55,7 @@ def get_flight_schema():
         StructField("ingestion_timestamp", LongType(), True),
     ])
 
+
 @pandas_udf(StringType()) # pyright: ignore[reportCallIssue]
 def country_code_from_icao_udf(icao_series):
     return icao_series.apply(get_country_code_from_airport_icao)
