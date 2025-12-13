@@ -210,6 +210,8 @@ __marimo__/
 spark
 draft.py
 draft2.py
-airports.json
-flights.json
-user_data.json
+raw_data/
+docker/.env
+
+# Files
+commands.txt

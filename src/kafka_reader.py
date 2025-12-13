@@ -66,7 +66,7 @@ def read_flight_stream(spark: SparkSession,
     """
     Reads flight data from Kafka stream and returns parsed DataFrame.
     
-    Args:
+    Args:   
         spark: SparkSession instance
         bootstrap_servers: Comma-separated list of Kafka bootstrap servers
         topic: Kafka topic name
@@ -152,7 +152,6 @@ if __name__ == "__main__":
 
     flights_df.writeStream \
         .format("org.apache.spark.sql.cassandra") \
-        .format("console") \
         .option("checkpointLocation", checkpoint_path + "aircrafts_by_icao/") \
         .options(table="aircrafts_by_icao24", keyspace="flight_analytics") \
         .outputMode("append") \
