@@ -16,8 +16,8 @@ ENV TRUSTSTORE_PATH=${CERTS_DIR}/truststore.jks
 ENV KEYSTORE_TYPE=JKS
 ENV TRUSTSTORE_TYPE=JKS
 # User credentials
-ENV NIFI_USERNAME=admin
-ENV NIFI_PASSWORD=Utlinhsaygex123.
+ARG NIFI_USERNAME
+ARG NIFI_PASSWORD
 
 # Create the certs directory
 RUN mkdir -p ${CERTS_DIR}
