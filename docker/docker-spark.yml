@@ -20,7 +20,7 @@ services:
         --conf spark.cassandra.connection.keepAliveMS=60000
         --conf spark.cassandra.auth.username=""
         --conf spark.cassandra.auth.password=""
-        /app/kafka_reader.py
+        /app/spark/reader.py
     restart: unless-stopped
     networks:
       - flight-network
