@@ -216,3 +216,4 @@ docker/.env
 # Files
 commands.txt
 src/opensky_auth.py
+credentials.json

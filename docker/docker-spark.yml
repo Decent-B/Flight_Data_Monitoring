@@ -2,7 +2,7 @@ version: '3.8'
  
  
 services:
-  spark-kafka-reader:
+  spark:
     build:
       context: ..
       dockerfile: docker/Dockerfile.spark
@@ -24,6 +24,15 @@ services:
     restart: unless-stopped
     networks:
       - flight-network
+    develop:
+      watch:
+        - action: sync
+          path: ../spark
+          target: /app/spark
+          ignore:
+            - __pycache__/
+        - action: rebuild
+          path: ../spark/reader.py
  
 networks:
   flight-network:
