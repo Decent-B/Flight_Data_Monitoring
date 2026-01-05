@@ -1,7 +1,6 @@
 from pyspark.sql import SparkSession, DataFrame
-from pyspark.sql.functions import col, from_json
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType, LongType, BooleanType, IntegerType
-from pyspark.sql.functions import window, countDistinct, to_timestamp, pandas_udf, from_unixtime, avg, max as spark_max, min as spark_min, approx_count_distinct, count
+from pyspark.sql.functions import window, countDistinct, to_timestamp, pandas_udf, from_unixtime, avg, max as spark_max, min as spark_min, approx_count_distinct, count, col, from_json
 import airportsdata
 import pycountry
 
@@ -142,6 +141,8 @@ if __name__ == "__main__":
         .config("spark.cassandra.connection.host", "cassandra-1,cassandra-2,cassandra-3") \
         .config("spark.cassandra.connection.port", "9042") \
         .config("spark.cassandra.connection.keepAliveMS", "60000") \
+        .config("spark.cassandra.auth.username", "cassandra") \
+        .config("spark.cassandra.auth.password", "cassandra") \
         .getOrCreate()
     checkpoint_path = "/tmp/checkpoints/"
     

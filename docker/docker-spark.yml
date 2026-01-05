@@ -7,7 +7,7 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.spark
     image: flight-data-spark:latest
-    container_name: spark-kafka-reader
+    container_name: spark
     ports:
       - "4040:4040"  # Spark Application UI
     command: >
@@ -18,8 +18,8 @@ services:
         --conf spark.cassandra.connection.host=cassandra-1,cassandra-2,cassandra-3
         --conf spark.cassandra.connection.port=9042
         --conf spark.cassandra.connection.keepAliveMS=60000
-        --conf spark.cassandra.auth.username=""
-        --conf spark.cassandra.auth.password=""
+        --conf spark.cassandra.auth.username=cassandra
+        --conf spark.cassandra.auth.password=cassandra
         /app/spark/reader.py
     restart: unless-stopped
     networks:

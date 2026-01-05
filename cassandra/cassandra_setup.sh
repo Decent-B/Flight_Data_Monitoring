@@ -48,8 +48,8 @@ docker-compose -f docker/docker-spark.yml build -q
 echo "✓ Spark image built"
 echo ""
 
-# 7. Run Kafka Reader
-echo "Step 7: Running Kafka Reader..."
+# 7. Run Spark Reader
+echo "Step 7: Running Spark Reader..."
 
 # Enable pipefail so if docker fails, the script fails (even with grep attached)
 set -o pipefail
@@ -62,7 +62,7 @@ docker run --rm --network docker_flight-network flight-data-spark:latest \
     --conf spark.cassandra.connection.host=cassandra-1,cassandra-2,cassandra-3 \
     --conf spark.cassandra.connection.port=9042 \
     --conf spark.cassandra.connection.keepAliveMS=60000 \
-    //app//kafka_reader.py \
+    //app//spark//reader.py \
     | grep --line-buffered -vE "^[0-9/]+ [0-9:]+ INFO"
 
 # Disable pipefail to return to normal bash behavior (optional)
