@@ -3,7 +3,7 @@ FROM apache/spark-py:v3.4.0
 USER root
  
 # Install Python dependencies
-RUN pip install --no-cache-dir confluent-kafka requests python-dateutil airportsdata pycountry pyarrow pandas
+RUN pip install --no-cache-dir confluent-kafka requests python-dateutil airportsdata pycountry pyarrow pandas reverse_geocode
  
 
 # Copy application code

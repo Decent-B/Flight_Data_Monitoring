@@ -1,9 +1,14 @@
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType, LongType, BooleanType, IntegerType, ArrayType, FloatType
-from pyspark.sql.functions import window, countDistinct, to_timestamp, pandas_udf, from_unixtime, avg, max as spark_max, min as spark_min, approx_count_distinct, count, col, from_json, explode, unix_timestamp, lag, floor
+from pyspark.sql.functions import window, countDistinct, to_timestamp, pandas_udf, from_unixtime, avg, max as spark_max, min as spark_min, approx_count_distinct, count, col, from_json, explode, unix_timestamp, lag, floor, last
 from pyspark.sql.window import Window
 import airportsdata
 import pycountry
+import reverse_geocode
+import math
+
+
+
 
 ############## Load flight data ################
 def get_country_name(country_code: str) -> str:
@@ -17,7 +22,6 @@ def get_country_name(country_code: str) -> str:
         Full country name or 'Unknown' if not found
     """
     try:
-        airports = airportsdata.load('ICAO')
         country = pycountry.countries.get(alpha_2=country_code)
         return country.name if country else "Unknown"
     except Exception:
@@ -31,6 +35,20 @@ def get_country_code_from_airport_icao(icao_code: str) -> str:
         return airport['country']  # Returns the ISO 2-letter country code (e.g., 'GB')
     except KeyError:
         return "Unknown Code"
+    
+
+def country_code_from_latlon(lat: float, lon: float) -> str | None:
+    if lat is None or lon is None:
+        return "Unknown"
+    # Check for NaN or infinite values
+    if math.isnan(lat) or math.isnan(lon) or math.isinf(lat) or math.isinf(lon):
+        return "Unknown"
+    try:
+        result = reverse_geocode.get((lat, lon))
+        cc = result.get("country_code")
+        return cc.upper() if cc else None
+    except (ValueError, Exception):
+        return "Unknown"
 
 def get_flight_schema():
     """Returns the schema for flight JSON data."""
@@ -61,6 +79,10 @@ def get_flight_schema():
 def country_code_from_icao_udf(icao_series):
     return icao_series.apply(get_country_code_from_airport_icao)
 
+@pandas_udf(StringType())
+def country_code_from_latlon_udf(lat_series, lon_series):
+    return lat_series.combine(lon_series, country_code_from_latlon)
+
 def read_flight_stream(spark: SparkSession, 
                        bootstrap_servers: str = "kafka-broker-1:9092,kafka-broker-2:9092,kafka-broker-3:9092",
                        topic: str = "flights_raw") -> DataFrame:
@@ -88,7 +110,7 @@ def read_flight_stream(spark: SparkSession,
                     .withColumn("data", from_json(col("value"), json_schema)) \
                     .select("data.*")
     
-    parsed_stream = parsed_stream.withColumn("timestamp", from_unixtime("time_position").cast("timestamp")) 
+    parsed_stream = parsed_stream.withColumn("timestamp", from_unixtime("time_position").cast("timestamp"))
     
     return parsed_stream
 #####################################################
@@ -204,12 +226,6 @@ def read_flightinfo_stream(spark: SparkSession,
         .withColumn("data", from_json(col("value"), json_schema)) \
         .select("data.*")
     
-    # Add country_code column derived from estDepartureAirport
-    parsed_stream = parsed_stream.withColumn(
-        "country_code", 
-        country_code_from_icao_udf(col("estDepartureAirport"))
-    )
-    
     return parsed_stream
 #####################################################
 
@@ -256,23 +272,117 @@ def get_aircraftstates_by_icao24(
     return result_df
 ######################################################
 
+#################### Table 3 ########################
+def get_aircrafts_by_cell_minute(flights_df: DataFrame) -> DataFrame:
+    """
+    Transforms flight data into minute-bucketed aircraft positions for live map visualization.
+    Groups aircraft by minute windows and returns latest position data for each aircraft.
+   
+    Args:
+        flights_df: DataFrame containing flight data with timestamp column
+       
+    Returns:
+        DataFrame with minute_bucket, icao24, and latest position/velocity data
+    """
+    # Add minute_bucket column: floor time_position to nearest minute
+    df_with_bucket = flights_df.withColumn(
+        "minute_bucket",
+        (col("time_position") / 60).cast("long") * 60
+    )
+   
+    # Add watermark for handling late data (10 seconds tolerance)
+    df_watermarked = df_with_bucket.withWatermark("timestamp", "10 seconds")
+   
+    # Group by 1-minute tumbling window and icao24, aggregate latest values
+    windowed_df = df_watermarked \
+        .groupBy(
+            window(col("timestamp"), "1 minute"),
+            col("icao24")
+        ) \
+        .agg(
+            spark_max("time_position").alias("last_seen_ts"),
+            last("latitude", ignorenulls=True).alias("lat"),
+            last("longitude", ignorenulls=True).alias("lon"),
+            last("geo_altitude", ignorenulls=True).alias("geo_altitude"),
+            last("velocity", ignorenulls=True).alias("velocity"),
+            last("true_track", ignorenulls=True).alias("true_track")
+        )
+   
+    # Extract minute_bucket from window and select final columns
+    result_df = windowed_df.select(
+        (col("window.start").cast("long")).alias("minute_bucket"),
+        col("icao24"),
+        col("last_seen_ts"),
+        col("lat"),
+        col("lon"),
+        col("geo_altitude"),
+        col("velocity"),
+        col("true_track")
+    )
+   
+    return result_df
+######################################################
+
 #################### Table 5 #########################
 def get_activeaircraft_by_country_hour(
-    flightinfo_df: DataFrame
+    flights_df: DataFrame
 ) -> DataFrame:
     """
     Aggregates active aircraft counts by country and hour.
-    Uses firstSeen timestamp from flight info data.
     
     Args:
-        flightinfo_df: DataFrame containing flight info data with firstSeen and country_code columns
+        flights_df: DataFrame containing flight wdata with country_code and timestamp columns
         
     Returns:
         DataFrame with country_code, hour_bucket, and active_aircraft_cnt
     """
+    # Add country_code column to flights_df
+    filtered_df = flights_df.withColumn("country_code", country_code_from_latlon_udf(col("latitude"), col("longitude")))
+
+    # Add watermark to handle late data (allow 10 minutes of late data)
+    df_with_watermark = filtered_df.withWatermark("timestamp", "10 minutes")
     
-    # Convert firstSeen (Unix timestamp in seconds) to timestamp type
-    df_with_timestamp = flightinfo_df.withColumn(
+    # Group by country and hourly window, count distinct aircraft
+    result_df = df_with_watermark.groupBy(
+        col("country_code"),
+        window(col("timestamp"), "1 hour").alias("hour_window")
+    ).agg(
+        approx_count_distinct("icao24").alias("active_aircraft_cnt")
+    )
+    
+    # Extract hour_bucket as Unix timestamp from window start
+    result_df = result_df.select(
+        col("country_code"),
+        unix_timestamp(col("hour_window.start")).alias("hour_bucket"),
+        col("active_aircraft_cnt")
+    )
+    
+    return result_df
+    
+    
+######################################################
+
+
+#################### Table 6 #########################
+def get_departures_by_country_hour(
+    flightinfo_df: DataFrame
+) -> DataFrame:
+    """
+    Detects departures (takeoffs) by tracking on_ground transitions and aggregates by country and hour.
+    
+    Args:
+        flights_df: DataFrame containing flight data with on_ground, timestamp, and country_code columns
+        
+    Returns:
+        DataFrame with country_code, hour_bucket, and arrivals_cnt
+    """
+    flitered_df = flightinfo_df.withColumn(
+        "country_code", 
+        country_code_from_icao_udf(col("estDepartureAirport"))
+    )
+
+    # Apply filters if provided
+    df_with_timestamp = flitered_df.withColumn(
         "timestamp",
         from_unixtime(col("firstSeen")).cast("timestamp")
     )
@@ -285,7 +395,7 @@ def get_activeaircraft_by_country_hour(
         col("country_code"),
         window(col("timestamp"), "1 hour").alias("hour_window")
     ).agg(
-        approx_count_distinct("icao24").alias("active_aircraft_cnt")
+        approx_count_distinct("icao24").alias("departures_cnt")
     )
     
     # Extract hour_bucket as Unix timestamp from window start
@@ -293,58 +403,7 @@ def get_activeaircraft_by_country_hour(
     result_df = result_df.select(
         col("country_code"),
         unix_timestamp(col("hour_window.start")).alias("hour_bucket"),
-        col("active_aircraft_cnt")
-    )
-    
-    return result_df
-######################################################
-
-
-#################### Table 7 #########################
-def get_arrivals_by_country_hour(
-    flights_df: DataFrame
-) -> DataFrame:
-    """
-    Detects arrivals (landings) by tracking on_ground transitions and aggregates by country and hour.
-    
-    Args:
-        flights_df: DataFrame containing flight data with on_ground, timestamp, and country_code columns
-        country_code: Optional country code to filter by (partition key)
-        hour_bucket: Optional Unix timestamp for hour to filter by (clustering key)
-        
-    Returns:
-        DataFrame with country_code, hour_bucket, and arrivals_cnt
-    """
-    # Apply filters if provided
-    filtered_df = flights_df
-    
-    # Define window partitioned by aircraft, ordered by timestamp
-    window_spec = Window.partitionBy("icao24").orderBy("timestamp")
-    
-    # Get previous on_ground state for each aircraft
-    df_with_prev = filtered_df.withColumn(
-        "prev_on_ground",
-        lag("on_ground", 1).over(window_spec)
-    )
-    
-    # Detect arrivals: transition from not on_ground (false) to on_ground (true)
-    arrivals_df = df_with_prev.filter(
-        (col("prev_on_ground") == False) & (col("on_ground") == True)
-    )
-    
-    # Group by country and hourly window, count arrivals
-    result_df = arrivals_df.groupBy(
-        col("country_code"),
-        window(col("timestamp"), "1 hour").alias("hour_window")
-    ).agg(
-        count("icao24").alias("arrivals_cnt")
-    )
-    
-    # Extract hour_bucket as Unix timestamp from window start
-    result_df = result_df.select(
-        col("country_code"),
-        unix_timestamp(col("hour_window.start")).alias("hour_bucket"),
-        col("arrivals_cnt")
+        col("departures_cnt")
     )
     
     return result_df
@@ -362,27 +421,46 @@ if __name__ == "__main__":
         .config("spark.cassandra.auth.password", "cassandra") \
         .getOrCreate()
     
+    # Load raw data
+    flights_df = read_flight_stream(spark)
+    track_df = read_track_stream(spark)
     flightinfo_df = read_flightinfo_stream(spark)
-    flightinfo_df.writeStream \
-        .format("console") \
+
+
+    # Running each query and writing to Cassandra
+    aircrafts_by_icao24 = get_aircrafts_by_icao(flights_df)
+    aircrafts_by_icao24.writeStream \
+        .format("org.apache.spark.sql.cassandra") \
+        .options(table="aircrafts_by_icao24", keyspace="flight_analytics") \
         .outputMode("append") \
-        .option("truncate", "false") \
-        .option("numRows", 5) \
+        .start()
+    
+    aircraftstates_by_icao24 = get_aircraftstates_by_icao24(track_df)
+    aircraftstates_by_icao24.writeStream \
+        .format("org.apache.spark.sql.cassandra") \
+        .options(table="aircraftstates_by_icao24", keyspace="flight_analytics") \
+        .outputMode("append") \
+        .start()
+    
+    aircrafts_by_cell_minute = get_aircrafts_by_cell_minute(flights_df)
+    aircrafts_by_cell_minute.writeStream \
+        .format("org.apache.spark.sql.cassandra") \
+        .options(table="aircrafts_by_cell_minute", keyspace="flight_analytics") \
+        .outputMode("append") \
         .start()
 
-    activeaircrafts = get_activeaircraft_by_country_hour(flightinfo_df)
-
-    activeaircrafts.writeStream \
-        .format("console") \
-        .outputMode("append") \
-        .option("truncate", "false") \
-        .option("numRows", 5) \
-        .start()
-
-    # Write to Cassandra
-    activeaircrafts.writeStream \
+    activeaircraft_by_country_hour = get_activeaircraft_by_country_hour(flights_df)
+    activeaircraft_by_country_hour.writeStream \
         .format("org.apache.spark.sql.cassandra") \
         .options(table="activeaircraft_by_country_hour", keyspace="flight_analytics") \
         .outputMode("append") \
+        .start()
+    
+    departures_by_country_hour = get_departures_by_country_hour(flightinfo_df)
+    departures_by_country_hour.writeStream \
+        .format("org.apache.spark.sql.cassandra") \
+        .options(table="departures_by_country_hour", keyspace="flight_analytics") \
+        .outputMode("append") \
         .start() \
         .awaitTermination()
+    
