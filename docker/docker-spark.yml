@@ -12,7 +12,7 @@ services:
       - "4040:4040"  # Spark Application UI
     command: >
       /opt/spark/bin/spark-submit
-        --master local[4]
+        --master local[*]
         --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.0,com.datastax.spark:spark-cassandra-connector_2.12:3.4.1,org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262
         --conf spark.sql.streaming.checkpointLocation=s3a://checkpoints/
         --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000

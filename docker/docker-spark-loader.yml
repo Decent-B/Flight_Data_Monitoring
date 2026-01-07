@@ -1,0 +1,27 @@
+version: '3.8'
+ 
+ 
+services:
+  spark-reader:
+    image: flight-data-spark:latest
+    container_name: spark-reader
+    volumes:
+      - ../spark:/app/spark
+    command: >
+      /opt/spark/bin/spark-submit
+        --master local[*]
+        --packages org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262
+        --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000
+        --conf spark.hadoop.fs.s3a.access.key=minioadmin
+        --conf spark.hadoop.fs.s3a.secret.key=minioadmin123
+        --conf spark.hadoop.fs.s3a.path.style.access=true
+        --conf spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem
+        --conf spark.hadoop.fs.s3a.connection.ssl.enabled=false
+        /app/spark/read_archive.py
+    networks:
+      - flight-network
+ 
+networks:
+  flight-network:
+    external: true
+    name: docker_flight-network

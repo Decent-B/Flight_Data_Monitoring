@@ -467,7 +467,7 @@ if __name__ == "__main__":
             .mode("append") \
             .partitionBy("year", "month", "day") \
             .option("compression", "snappy") \
-            .parquet("s3a://flight-data")
+            .parquet("s3a://flight-data/")
     
     def archive_tracks_to_minio(batch_df: DataFrame, batch_id: int):
         """Archives flight track data to MinIO."""
@@ -486,7 +486,7 @@ if __name__ == "__main__":
             .mode("append") \
             .partitionBy("year", "month", "day") \
             .option("compression", "snappy") \
-            .parquet("s3a://flight-tracks")
+            .parquet("s3a://flight-tracks/")
     
     # Load raw data
     flights_df = read_flight_stream(spark)
@@ -505,9 +505,9 @@ if __name__ == "__main__":
     
     # MinIO Archival: Raw flight states (10-minute micro-batches)
     query_archive_flights = flights_df.writeStream \
-        .foreachBatch(lambda batch_df, batch_id: archive_to_minio(batch_df, batch_id, "s3a://flight-raw", "timestamp")) \
+        .foreachBatch(lambda batch_df, batch_id: archive_to_minio(batch_df, batch_id, "s3a://flight-raw/", "timestamp")) \
         .option("checkpointLocation", checkpoint_path + "archive_flights/") \
-        .trigger(processingTime="5 minutes") \
+        .trigger(processingTime="1 minute") \
         .start()
     
     aircraftstates_by_icao24 = get_aircraftstates_by_icao24(track_df)
@@ -522,7 +522,7 @@ if __name__ == "__main__":
     query_archive_tracks = track_df.writeStream \
         .foreachBatch(archive_tracks_to_minio) \
         .option("checkpointLocation", checkpoint_path + "archive_tracks/") \
-        .trigger(processingTime="5 minutes") \
+        .trigger(processingTime="1 minute") \
         .start()
     
     aircrafts_by_cell_minute = get_aircrafts_by_cell_minute(flights_df)
@@ -553,7 +553,7 @@ if __name__ == "__main__":
     query_archive_flight_data = flightinfo_df.writeStream \
         .foreachBatch(archive_flight_data_to_minio) \
         .option("checkpointLocation", checkpoint_path + "archive_flight_data/") \
-        .trigger(processingTime="10 minutes") \
+        .trigger(processingTime="1 minute") \
         .start()
     
     # Keep all streams running
