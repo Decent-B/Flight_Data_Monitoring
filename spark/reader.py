@@ -1,11 +1,12 @@
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType, LongType, BooleanType, IntegerType, ArrayType, FloatType
-from pyspark.sql.functions import window, countDistinct, to_timestamp, pandas_udf, from_unixtime, avg, max as spark_max, min as spark_min, approx_count_distinct, count, col, from_json, explode, unix_timestamp, lag, floor, last
+from pyspark.sql.functions import window, countDistinct, to_timestamp, pandas_udf, from_unixtime, avg, max as spark_max, min as spark_min, approx_count_distinct, count, col, from_json, explode, unix_timestamp, lag, floor, last, year, month, dayofmonth
 from pyspark.sql.window import Window
 import airportsdata
 import pycountry
 import reverse_geocode
 import math
+from datetime import datetime
 
 
 
@@ -421,6 +422,72 @@ if __name__ == "__main__":
         .config("spark.cassandra.auth.password", "cassandra") \
         .getOrCreate()
     
+    checkpoint_path = "s3a://checkpoints/"
+    
+    # MinIO archival functions
+    def archive_to_minio(batch_df: DataFrame, batch_id: int, bucket: str, timestamp_col: str = "timestamp"):
+        """
+        Archives batch data to MinIO as Parquet with date partitioning.
+        
+        Args:
+            batch_df: Batch DataFrame to archive
+            batch_id: Batch ID from Spark Structured Streaming
+            bucket: S3A bucket path (e.g., 's3a://flight-raw')
+            timestamp_col: Column name for timestamp partitioning
+        """
+        if batch_df.isEmpty():
+            return
+        
+        # Add partition columns from timestamp
+        partitioned_df = batch_df \
+            .withColumn("year", year(col(timestamp_col))) \
+            .withColumn("month", month(col(timestamp_col))) \
+            .withColumn("day", dayofmonth(col(timestamp_col)))
+        
+        # Write as Parquet with date partitioning
+        partitioned_df.write \
+            .mode("append") \
+            .partitionBy("year", "month", "day") \
+            .option("compression", "snappy") \
+            .parquet(bucket)
+    
+    def archive_flight_data_to_minio(batch_df: DataFrame, batch_id: int):
+        """Archives flight connection data to MinIO."""
+        if batch_df.isEmpty():
+            return
+        
+        # Add partition columns from firstSeen_timestamp
+        partitioned_df = batch_df \
+            .withColumn("year", year(col("firstSeen_timestamp"))) \
+            .withColumn("month", month(col("firstSeen_timestamp"))) \
+            .withColumn("day", dayofmonth(col("firstSeen_timestamp")))
+        
+        # Write as Parquet with date partitioning
+        partitioned_df.write \
+            .mode("append") \
+            .partitionBy("year", "month", "day") \
+            .option("compression", "snappy") \
+            .parquet("s3a://flight-data")
+    
+    def archive_tracks_to_minio(batch_df: DataFrame, batch_id: int):
+        """Archives flight track data to MinIO."""
+        if batch_df.isEmpty():
+            return
+        
+        # Add partition columns from startTime
+        partitioned_df = batch_df \
+            .withColumn("start_timestamp", from_unixtime(col("startTime")).cast("timestamp")) \
+            .withColumn("year", year(col("start_timestamp"))) \
+            .withColumn("month", month(col("start_timestamp"))) \
+            .withColumn("day", dayofmonth(col("start_timestamp")))
+        
+        # Write as Parquet with date partitioning
+        partitioned_df.write \
+            .mode("append") \
+            .partitionBy("year", "month", "day") \
+            .option("compression", "snappy") \
+            .parquet("s3a://flight-tracks")
+    
     # Load raw data
     flights_df = read_flight_stream(spark)
     track_df = read_track_stream(spark)
@@ -429,38 +496,66 @@ if __name__ == "__main__":
 
     # Running each query and writing to Cassandra
     aircrafts_by_icao24 = get_aircrafts_by_icao(flights_df)
-    aircrafts_by_icao24.writeStream \
+    query1 = aircrafts_by_icao24.writeStream \
         .format("org.apache.spark.sql.cassandra") \
+        .option("checkpointLocation", checkpoint_path + "aircrafts_by_icao/") \
         .options(table="aircrafts_by_icao24", keyspace="flight_analytics") \
         .outputMode("append") \
         .start()
     
+    # MinIO Archival: Raw flight states (10-minute micro-batches)
+    query_archive_flights = flights_df.writeStream \
+        .foreachBatch(lambda batch_df, batch_id: archive_to_minio(batch_df, batch_id, "s3a://flight-raw", "timestamp")) \
+        .option("checkpointLocation", checkpoint_path + "archive_flights/") \
+        .trigger(processingTime="5 minutes") \
+        .start()
+    
     aircraftstates_by_icao24 = get_aircraftstates_by_icao24(track_df)
-    aircraftstates_by_icao24.writeStream \
+    query2 = aircraftstates_by_icao24.writeStream \
         .format("org.apache.spark.sql.cassandra") \
+        .option("checkpointLocation", checkpoint_path + "aircraftstates_by_icao/") \
         .options(table="aircraftstates_by_icao24", keyspace="flight_analytics") \
         .outputMode("append") \
         .start()
     
+    # MinIO Archival: Flight tracks (10-minute micro-batches)
+    query_archive_tracks = track_df.writeStream \
+        .foreachBatch(archive_tracks_to_minio) \
+        .option("checkpointLocation", checkpoint_path + "archive_tracks/") \
+        .trigger(processingTime="5 minutes") \
+        .start()
+    
     aircrafts_by_cell_minute = get_aircrafts_by_cell_minute(flights_df)
-    aircrafts_by_cell_minute.writeStream \
+    query3 = aircrafts_by_cell_minute.writeStream \
         .format("org.apache.spark.sql.cassandra") \
+        .option("checkpointLocation", checkpoint_path + "aircrafts_by_cell_minute/") \
         .options(table="aircrafts_by_cell_minute", keyspace="flight_analytics") \
         .outputMode("append") \
         .start()
 
     activeaircraft_by_country_hour = get_activeaircraft_by_country_hour(flights_df)
-    activeaircraft_by_country_hour.writeStream \
+    query4 = activeaircraft_by_country_hour.writeStream \
         .format("org.apache.spark.sql.cassandra") \
+        .option("checkpointLocation", checkpoint_path + "activeaircraft_by_country_hour/") \
         .options(table="activeaircraft_by_country_hour", keyspace="flight_analytics") \
         .outputMode("append") \
         .start()
     
     departures_by_country_hour = get_departures_by_country_hour(flightinfo_df)
-    departures_by_country_hour.writeStream \
+    query5 = departures_by_country_hour.writeStream \
         .format("org.apache.spark.sql.cassandra") \
+        .option("checkpointLocation", checkpoint_path + "departures_by_country_hour/") \
         .options(table="departures_by_country_hour", keyspace="flight_analytics") \
         .outputMode("append") \
-        .start() \
-        .awaitTermination()
+        .start()
+    
+    # MinIO Archival: Flight connection data (10-minute micro-batches)
+    query_archive_flight_data = flightinfo_df.writeStream \
+        .foreachBatch(archive_flight_data_to_minio) \
+        .option("checkpointLocation", checkpoint_path + "archive_flight_data/") \
+        .trigger(processingTime="10 minutes") \
+        .start()
+    
+    # Keep all streams running
+    spark.streams.awaitAnyTermination()
     
