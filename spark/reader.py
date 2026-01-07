@@ -456,6 +456,8 @@ if __name__ == "__main__":
         if batch_df.isEmpty():
             return
         
+        batch_df = batch_df.withColumn("firstSeen_timestamp", from_unixtime(col("firstSeen")).cast("timestamp"))
+
         # Add partition columns from firstSeen_timestamp
         partitioned_df = batch_df \
             .withColumn("year", year(col("firstSeen_timestamp"))) \
