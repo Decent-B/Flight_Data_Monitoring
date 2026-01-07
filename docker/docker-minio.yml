@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    ports:
+      - "9000:9000"  # S3 API
+      - "9090:9090"  # MinIO Console UI
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    command: server /data --console-address ":9090"
+    volumes:
+      - minio-data:/data
+    networks:
+      - flight-network
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Create buckets on startup
+  minio-init:
+    image: minio/mc:latest
+    container_name: minio-init
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      sleep 10;
+      mc alias set myminio http://minio:9000 minioadmin minioadmin123;
+      mc mb myminio/flight-raw --ignore-existing;
+      mc mb myminio/flight-data --ignore-existing;
+      mc mb myminio/flight-tracks --ignore-existing;
+      mc mb myminio/checkpoints --ignore-existing;
+      echo 'Buckets created successfully';
+      "
+    networks:
+      - flight-network
+
+networks:
+  flight-network:
+    external: true
+    name: docker_flight-network
+
+volumes:
+  minio-data:
+    driver: local
