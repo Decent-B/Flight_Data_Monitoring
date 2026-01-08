@@ -1,3 +1,4 @@
+import os
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType, LongType, BooleanType, IntegerType, ArrayType, FloatType
 from pyspark.sql.functions import window, countDistinct, to_timestamp, pandas_udf, from_unixtime, avg, max as spark_max, min as spark_min, approx_count_distinct, count, col, from_json, explode, unix_timestamp, lag, floor, last, year, month, dayofmonth
@@ -412,17 +413,50 @@ def get_departures_by_country_hour(
 
     
 if __name__ == "__main__":
+    def env_bool(name: str, default: bool) -> bool:
+        value = os.environ.get(name)
+        if value is None:
+            return default
+        return value.strip().lower() in ("1", "true", "yes", "y")
+
+    kafka_bootstrap = os.environ.get(
+        "KAFKA_BOOTSTRAP_SERVERS",
+        "kafka-broker-1:9092,kafka-broker-2:9092,kafka-broker-3:9092",
+    )
+    cassandra_hosts = os.environ.get(
+        "CASSANDRA_HOSTS",
+        "cassandra-1,cassandra-2,cassandra-3",
+    )
+    cassandra_port = os.environ.get("CASSANDRA_PORT", "9042")
+    cassandra_username = os.environ.get("CASSANDRA_USERNAME", "cassandra")
+    cassandra_password = os.environ.get("CASSANDRA_PASSWORD", "cassandra")
+
+    minio_endpoint = os.environ.get("MINIO_ENDPOINT", "http://minio:9000")
+    minio_access_key = os.environ.get("MINIO_ACCESS_KEY", "minioadmin")
+    minio_secret_key = os.environ.get("MINIO_SECRET_KEY", "minioadmin123")
+    minio_ssl_enabled = env_bool("MINIO_SSL_ENABLED", False)
+    minio_path_style = env_bool("MINIO_PATH_STYLE_ACCESS", True)
+
+    checkpoint_path = os.environ.get("SPARK_CHECKPOINT_PATH", "s3a://checkpoints/")
+    bucket_flight_raw = os.environ.get("BUCKET_FLIGHT_RAW", "s3a://flight-raw/")
+    bucket_flight_data = os.environ.get("BUCKET_FLIGHT_DATA", "s3a://flight-data/")
+    bucket_flight_tracks = os.environ.get("BUCKET_FLIGHT_TRACKS", "s3a://flight-tracks/")
+
     spark = SparkSession \
         .builder \
         .appName("StructuredNetworkFlight") \
-        .config("spark.cassandra.connection.host", "cassandra-1,cassandra-2,cassandra-3") \
-        .config("spark.cassandra.connection.port", "9042") \
+        .config("spark.cassandra.connection.host", cassandra_hosts) \
+        .config("spark.cassandra.connection.port", cassandra_port) \
         .config("spark.cassandra.connection.keepAliveMS", "60000") \
-        .config("spark.cassandra.auth.username", "cassandra") \
-        .config("spark.cassandra.auth.password", "cassandra") \
+        .config("spark.cassandra.auth.username", cassandra_username) \
+        .config("spark.cassandra.auth.password", cassandra_password) \
+        .config("spark.hadoop.fs.s3a.endpoint", minio_endpoint) \
+        .config("spark.hadoop.fs.s3a.access.key", minio_access_key) \
+        .config("spark.hadoop.fs.s3a.secret.key", minio_secret_key) \
+        .config("spark.hadoop.fs.s3a.path.style.access", str(minio_path_style).lower()) \
+        .config("spark.hadoop.fs.s3a.connection.ssl.enabled", str(minio_ssl_enabled).lower()) \
+        .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
         .getOrCreate()
-    
-    checkpoint_path = "s3a://checkpoints/"
     
     # MinIO archival functions
     def archive_to_minio(batch_df: DataFrame, batch_id: int, bucket: str, timestamp_col: str = "timestamp"):
@@ -469,7 +503,7 @@ if __name__ == "__main__":
             .mode("append") \
             .partitionBy("year", "month", "day") \
             .option("compression", "snappy") \
-            .parquet("s3a://flight-data/")
+            .parquet(bucket_flight_data)
     
     def archive_tracks_to_minio(batch_df: DataFrame, batch_id: int):
         """Archives flight track data to MinIO."""
@@ -488,12 +522,12 @@ if __name__ == "__main__":
             .mode("append") \
             .partitionBy("year", "month", "day") \
             .option("compression", "snappy") \
-            .parquet("s3a://flight-tracks/")
+            .parquet(bucket_flight_tracks)
     
     # Load raw data
-    flights_df = read_flight_stream(spark)
-    track_df = read_track_stream(spark)
-    flightinfo_df = read_flightinfo_stream(spark)
+    flights_df = read_flight_stream(spark, bootstrap_servers=kafka_bootstrap)
+    track_df = read_track_stream(spark, bootstrap_servers=kafka_bootstrap)
+    flightinfo_df = read_flightinfo_stream(spark, bootstrap_servers=kafka_bootstrap)
 
 
     # Running each query and writing to Cassandra
@@ -507,7 +541,7 @@ if __name__ == "__main__":
     
     # MinIO Archival: Raw flight states (10-minute micro-batches)
     query_archive_flights = flights_df.writeStream \
-        .foreachBatch(lambda batch_df, batch_id: archive_to_minio(batch_df, batch_id, "s3a://flight-raw/", "timestamp")) \
+        .foreachBatch(lambda batch_df, batch_id: archive_to_minio(batch_df, batch_id, bucket_flight_raw, "timestamp")) \
         .option("checkpointLocation", checkpoint_path + "archive_flights/") \
         .trigger(processingTime="5 minutes") \
         .start()

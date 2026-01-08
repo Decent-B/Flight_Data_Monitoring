@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spark-stream
+  namespace: spark
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spark-stream
+  template:
+    metadata:
+      labels:
+        app: spark-stream
+    spec:
+      containers:
+      - name: spark-stream
+        image: flight-data-spark:latest
+        imagePullPolicy: IfNotPresent
+        command:
+        - /opt/spark/bin/spark-submit
+        args:
+        - --master
+        - local[4]
+        - --packages
+        - org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.0,com.datastax.spark:spark-cassandra-connector_2.12:3.4.1,org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262
+        - /app/spark/reader.py
+        envFrom:
+        - configMapRef:
+            name: spark-stream-config
+        - secretRef:
+            name: spark-stream-secrets
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "1Gi"
+          limits:
+            cpu: "1"
+            memory: "2Gi"
