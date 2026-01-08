@@ -1,0 +1,111 @@
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                                                                           ║
+║           APACHE SUPERSET - QUICK REFERENCE CARD                          ║
+║                                                                           ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│ 🌐 ACCESS SUPERSET                                                        │
+└───────────────────────────────────────────────────────────────────────────┘
+
+  Command:  minikube service -n superset superset --url
+  
+  URL:      http://127.0.0.1:<port>
+  
+  Login:    Username: admin
+            Password: admin
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│ 📊 AVAILABLE DATASETS                                                     │
+└───────────────────────────────────────────────────────────────────────────┘
+
+  1. aircrafts_by_icao24               - Aircraft master data
+  2. activeaircraft_by_country_hour    - Active aircraft (hourly)
+  3. activeaircraft_by_country_minute  - Active aircraft (real-time)
+  4. departureaircraft_by_icao24_day   - Departure tracking
+  5. arrivalaircraft_by_icao24_day     - Arrival tracking
+  6. aircrafts_by_cell_minute          - Geographic distribution
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│ 🎨 QUICK CHART IDEAS                                                      │
+└───────────────────────────────────────────────────────────────────────────┘
+
+  📈 Pie Chart: Aircraft by Country
+     Dataset:   activeaircraft_by_country_hour
+     Dimension: country_code
+     Metric:    COUNT(*)
+
+  📉 Line Chart: Activity Over Time
+     Dataset:    activeaircraft_by_country_hour
+     Time:       hour_bucket
+     Metric:     COUNT(*)
+     Dimensions: country_code
+
+  📊 Bar Chart: Departures vs Arrivals
+     Dataset 1:  departureaircraft_by_icao24_day
+     Dataset 2:  arrivalaircraft_by_icao24_day
+     Compare:    COUNT(*) by day_bucket
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│ 🔧 MANAGEMENT COMMANDS                                                    │
+└───────────────────────────────────────────────────────────────────────────┘
+
+  View Logs:
+    kubectl logs -n superset -l app=superset -f
+
+  Check Status:
+    kubectl get pods -n superset
+
+  Restart:
+    kubectl rollout restart deployment/superset -n superset
+
+  Redeploy:
+    ./superset/scripts/deploy_superset.sh
+
+  Add Datasets:
+    ./superset/scripts/add_superset_datasets.sh
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│ 🗂️ SAMPLE DATA                                                            │
+└───────────────────────────────────────────────────────────────────────────┘
+
+  Total Aircraft: 5
+
+  Distribution:
+    🇻🇳 Vietnam (VN):        2 aircraft (ABC123, MNO345)
+    🇺🇸 United States (US):  1 aircraft (GHI789)
+    🇸🇬 Singapore (SG):      1 aircraft (DEF456)
+    🇬🇧 United Kingdom (GB): 1 aircraft (JKL012)
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│ 🔗 DATA FLOW                                                              │
+└───────────────────────────────────────────────────────────────────────────┘
+
+  Superset → Trino → Cassandra
+  
+  ✓ Trino is the ONLY data source
+  ✓ All queries go through Trino (no direct Cassandra access)
+  ✓ Catalog: cassandra.properties
+  ✓ Schema: flight_analytics
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│ 📚 DOCUMENTATION                                                          │
+└───────────────────────────────────────────────────────────────────────────┘
+
+  Deployment Summary:  SUPERSET_DEPLOYMENT_SUMMARY.md
+  Complete Guide:      SUPERSET_GUIDE.md
+  Schema:              cassandra/schema/create_tables.cql
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│ ✅ STATUS                                                                 │
+└───────────────────────────────────────────────────────────────────────────┘
+
+  ✓ Superset:   RUNNING
+  ✓ PostgreSQL: RUNNING
+  ✓ Redis:      RUNNING
+  ✓ Trino:      CONNECTED & TESTED
+  ✓ Data:       5 SAMPLE AIRCRAFT AVAILABLE
+
+╔═══════════════════════════════════════════════════════════════════════════╗
+║  Ready to use! Access Superset and start visualizing your flight data.   ║
+╚═══════════════════════════════════════════════════════════════════════════╝

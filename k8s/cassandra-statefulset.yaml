@@ -1,0 +1,90 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cassandra
+  namespace: default
+  labels:
+    app: cassandra
+spec:
+  clusterIP: None
+  ports:
+  - port: 9042
+    name: cql
+  selector:
+    app: cassandra
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: cassandra
+  namespace: default
+spec:
+  serviceName: cassandra
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cassandra
+  template:
+    metadata:
+      labels:
+        app: cassandra
+    spec:
+      containers:
+      - name: cassandra
+        image: cassandra:4.1
+        ports:
+        - containerPort: 7000
+          name: intra-node
+        - containerPort: 7001
+          name: tls-intra-node
+        - containerPort: 7199
+          name: jmx
+        - containerPort: 9042
+          name: cql
+        resources:
+          limits:
+            cpu: "2"
+            memory: 4Gi
+          requests:
+            cpu: "1"
+            memory: 4Gi
+        env:
+        - name: MAX_HEAP_SIZE
+          value: "2G"
+        - name: HEAP_NEWSIZE
+          value: "512M"
+        - name: CASSANDRA_CLUSTER_NAME
+          value: "FlightAnalytics"
+        - name: CASSANDRA_DC
+          value: "dc1"
+        - name: CASSANDRA_RACK
+          value: "rack1"
+        - name: CASSANDRA_ENDPOINT_SNITCH
+          value: "GossipingPropertyFileSnitch"
+        - name: CASSANDRA_SEEDS
+          value: "cassandra-0.cassandra.default.svc.cluster.local"
+        volumeMounts:
+        - name: cassandra-data
+          mountPath: /var/lib/cassandra
+        readinessProbe:
+          exec:
+            command:
+            - /bin/bash
+            - -c
+            - nodetool status | grep -E "^UN"
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+        livenessProbe:
+          tcpSocket:
+            port: 9042
+          initialDelaySeconds: 90
+          periodSeconds: 30
+  volumeClaimTemplates:
+  - metadata:
+      name: cassandra-data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 5Gi

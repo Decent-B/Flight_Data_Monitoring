@@ -1,0 +1,287 @@
+---
+# Superset Database (PostgreSQL for metadata)
+apiVersion: v1
+kind: Service
+metadata:
+  name: superset-postgres
+  namespace: superset
+spec:
+  ports:
+  - port: 5432
+  selector:
+    app: superset-postgres
+  clusterIP: None
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: superset-postgres
+  namespace: superset
+spec:
+  serviceName: superset-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: superset-postgres
+  template:
+    metadata:
+      labels:
+        app: superset-postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:14
+        env:
+        - name: POSTGRES_DB
+          value: superset
+        - name: POSTGRES_USER
+          value: superset
+        - name: POSTGRES_PASSWORD
+          value: superset
+        ports:
+        - containerPort: 5432
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-storage
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 2Gi
+---
+# Redis for caching
+apiVersion: v1
+kind: Service
+metadata:
+  name: superset-redis
+  namespace: superset
+spec:
+  ports:
+  - port: 6379
+  selector:
+    app: superset-redis
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: superset-redis
+  namespace: superset
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: superset-redis
+  template:
+    metadata:
+      labels:
+        app: superset-redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        ports:
+        - containerPort: 6379
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+---
+# Superset ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: superset-config
+  namespace: superset
+data:
+  superset_config.py: |
+    import os
+    
+    # Superset metadata database
+    SQLALCHEMY_DATABASE_URI = 'postgresql://superset:superset@superset-postgres:5432/superset'
+    
+    # Redis cache
+    CACHE_CONFIG = {
+        'CACHE_TYPE': 'RedisCache',
+        'CACHE_DEFAULT_TIMEOUT': 300,
+        'CACHE_KEY_PREFIX': 'superset_',
+        'CACHE_REDIS_HOST': 'superset-redis',
+        'CACHE_REDIS_PORT': 6379,
+        'CACHE_REDIS_DB': 1,
+    }
+    
+    DATA_CACHE_CONFIG = CACHE_CONFIG
+    
+    # Secret key for session encryption
+    SECRET_KEY = 'thisISaSECRET_1234_CHANGE_IN_PRODUCTION'
+    
+    # Disable example data loading
+    SUPERSET_LOAD_EXAMPLES = False
+    
+    # Feature flags
+    FEATURE_FLAGS = {
+        'DASHBOARD_NATIVE_FILTERS': True,
+        'ENABLE_TEMPLATE_PROCESSING': True,
+        'SQLLAB_BACKEND_PERSISTENCE': True,
+    }
+    
+    # Webserver configuration
+    SUPERSET_WEBSERVER_PROTOCOL = 'http'
+    SUPERSET_WEBSERVER_PORT = 8088
+    
+    # SQL Lab settings
+    SQLLAB_TIMEOUT = 300
+    SUPERSET_WEBSERVER_TIMEOUT = 300
+---
+# Superset Init Job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: superset-init
+  namespace: superset
+spec:
+  template:
+    metadata:
+      labels:
+        app: superset-init
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+      - name: wait-for-postgres
+        image: busybox:1.28
+        command: ['sh', '-c', 'until nc -z superset-postgres 5432; do echo waiting for postgres; sleep 2; done']
+      containers:
+      - name: superset-init
+        image: apache/superset:latest-dev
+        securityContext:
+          runAsUser: 0
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          echo "Installing Trino connector..."
+          pip install trino sqlalchemy-trino
+          
+          echo "Upgrading database..."
+          superset db upgrade
+          
+          echo "Creating admin user..."
+          superset fab create-admin \
+            --username admin \
+            --firstname Admin \
+            --lastname User \
+            --email admin@superset.com \
+            --password admin || true
+          
+          echo "Initializing Superset..."
+          superset init
+          
+          echo "Superset initialized successfully!"
+        env:
+        - name: SUPERSET_CONFIG_PATH
+          value: /app/pythonpath/superset_config.py
+        volumeMounts:
+        - name: superset-config
+          mountPath: /app/pythonpath
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+      volumes:
+      - name: superset-config
+        configMap:
+          name: superset-config
+---
+# Superset Application
+apiVersion: v1
+kind: Service
+metadata:
+  name: superset
+  namespace: superset
+spec:
+  type: NodePort
+  ports:
+  - port: 8088
+    targetPort: 8088
+    protocol: TCP
+  selector:
+    app: superset
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: superset
+  namespace: superset
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: superset
+  template:
+    metadata:
+      labels:
+        app: superset
+    spec:
+      containers:
+      - name: superset
+        image: apache/superset:latest-dev
+        securityContext:
+          runAsUser: 0
+        command:
+        - /bin/bash
+        - -c
+        - |
+          # Install Trino drivers
+          pip install trino sqlalchemy-trino
+          
+          # Start Superset
+          superset run -h 0.0.0.0 -p 8088 --with-threads --reload
+        ports:
+        - containerPort: 8088
+        env:
+        - name: SUPERSET_CONFIG_PATH
+          value: /app/pythonpath/superset_config.py
+        volumeMounts:
+        - name: superset-config
+          mountPath: /app/pythonpath
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8088
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8088
+          initialDelaySeconds: 90
+          periodSeconds: 30
+          timeoutSeconds: 5
+      volumes:
+      - name: superset-config
+        configMap:
+          name: superset-config
