@@ -10,17 +10,8 @@ USE flight_analytics;
 CREATE TABLE IF NOT EXISTS aircrafts_by_icao24 (
     icao24 text,
     callsign text,
-    last_seen_ts bigint,
     lat double,
     lon double,
-    geo_altitude double,
-    velocity double,
-    true_track double,
-    vertical_rate double,
-    on_ground boolean,
-    geo_cell text,
-    country_code text,
-    origin_country text,
     PRIMARY KEY (icao24)
 );
 

@@ -230,13 +230,13 @@ This may take 2-3 minutes the first time.
 Now run the script that generates and loads test data:
 
 ```bash
-docker run --rm --network docker_flight-network flight-data-spark:latest /opt/spark/bin/spark-submit --master local[*] --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.0,com.datastax.spark:spark-cassandra-connector_2.12:3.4.1 --conf spark.cassandra.connection.host=cassandra-1,cassandra-2,cassandra-3 --conf spark.cassandra.connection.port=9042 --conf spark.cassandra.connection.keepAliveMS=60000 /app/spark_dummy_loader.py
+docker run --rm --network docker_flight-network flight-data-spark:latest /opt/spark/bin/spark-submit --master local[*] --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.0,com.datastax.spark:spark-cassandra-connector_2.12:3.4.1 --conf spark.cassandra.connection.host=cassandra-1,cassandra-2,cassandra-3 --conf spark.cassandra.connection.port=9042 --conf spark.cassandra.connection.keepAliveMS=60000 /app/kafka_reader.py
 ```
 
 **What this does:**
 - Starts a temporary Spark container
 - Loads necessary libraries for Cassandra connectivity
-- Runs `spark_dummy_loader.py` which generates and writes test data
+- Runs `kafka_reader.py` which generates and writes test data
 - Automatically removes the container when done (`--rm`)
 
 **What to expect:** You'll see lots of Spark logging. Look for these success messages:

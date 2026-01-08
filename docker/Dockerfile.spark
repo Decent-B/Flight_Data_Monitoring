@@ -3,15 +3,17 @@ FROM apache/spark-py:v3.4.0
 USER root
  
 # Install Python dependencies
-RUN pip install --no-cache-dir confluent-kafka requests python-dateutil
+RUN pip install --no-cache-dir confluent-kafka requests python-dateutil airportsdata pycountry pyarrow pandas reverse_geocode
  
 
 # Copy application code
-COPY src/kafka_reader.py /app/kafka_reader.py
-COPY src/spark_dummy_loader.py /app/spark_dummy_loader.py
+COPY kafka/ /app/kafka/
+COPY spark/ /app/spark/
+# COPY src/kafka_reader.py /app/kafka_reader.py
+# COPY src/utils.py /app/utils.py
  
 # Update Kafka bootstrap servers for Docker network - use internal container names
-RUN sed -i 's/localhost:29092,localhost:29093,localhost:29094/kafka-broker-1:9092,kafka-broker-2:9092,kafka-broker-3:9092/g' /app/kafka_reader.py
+RUN sed -i 's/localhost:29092,localhost:29093,localhost:29094/kafka-broker-1:9092,kafka-broker-2:9092,kafka-broker-3:9092/g' /app/spark/reader.py
  
 # Create directories with proper permissions
 RUN mkdir -p /tmp/checkpoints /tmp/spark-events /opt/spark/.ivy2 /opt/spark/work-dir && \
@@ -26,4 +28,4 @@ WORKDIR /opt/spark/work-dir
 USER 185
  
 # Default command (will be overridden by docker-compose)
-CMD ["/opt/spark/bin/spark-submit", "/app/kafka_reader.py"]
+CMD ["/opt/spark/bin/spark-submit", "/app/spark/reader.py"]

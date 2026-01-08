@@ -18,8 +18,11 @@ class KafkaConfig:
     
     # Topics
     FLIGHTS_RAW_TOPIC = 'flights_raw'
-    FLIGHTS_PROCESSED_TOPIC = 'flights_processed'
-    FLIGHTS_ALERTS_TOPIC = 'flights_alerts'
+    FLIGHTS_DATA_TOPIC = 'flight_data'
+    FLIGHTS_TRACK_TOPIC = 'flight_track'
+    CURRENT_WEATHER_TOPIC = 'current_airport_weather'
+    FUTURE_WEATHER_TOPIC = 'future_airport_weather'
+    WEATHER_WARNING_TOPIC = 'weather_warnings'
     
     # Producer Configuration
     PRODUCER_CONFIG: Dict = {
@@ -30,7 +33,7 @@ class KafkaConfig:
         'max.in.flight.requests.per.connection': 5, # # Maximum number of unacknowledged requests per connection
         'compression.type': 'snappy',   # Compress messages with Snappy to reduce network and disk usage
         'linger.ms': 10,  # Batch messages for 10ms for better throughput
-        'batch.size': 16384,  # 16KB batch size
+        'batch.size': 2048,  # 2KB batch size
         'enable.idempotence': True,  # Exactly-once semantics
         'request.timeout.ms': 30000,
         'delivery.timeout.ms': 120000,  # Compress messages with Snappy to reduce network and disk usage
