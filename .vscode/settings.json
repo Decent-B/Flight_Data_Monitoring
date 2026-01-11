@@ -25,6 +25,9 @@
         "pkill": true,
         "kubectl top": true,
         "kubectl scale": true,
-        "helm": true
+        "helm": true,
+        "aws": true,
+        "eksctl": true,
+        "kubectl cluster-info": true
     }
 }

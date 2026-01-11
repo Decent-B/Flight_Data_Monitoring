@@ -1,0 +1,133 @@
+# Superset Helm Values for GKE
+
+# Image configuration
+image:
+  repository: apache/superset
+  tag: "3.0.3"
+  pullPolicy: IfNotPresent
+
+# Superset configuration
+supersetNode:
+  replicaCount: 1
+  
+  resources:
+    requests:
+      cpu: 250m
+      memory: 1Gi
+    limits:
+      cpu: 500m
+      memory: 2Gi
+  
+  nodeSelector:
+    workload: app
+  
+  tolerations:
+    - key: "cloud.google.com/gke-spot"
+      operator: "Equal"
+      value: "true"
+      effect: "NoSchedule"
+
+# Init containers
+init:
+  enabled: true
+  loadExamples: false
+  createAdmin: true
+  adminUser:
+    username: admin
+    firstname: Admin
+    lastname: User
+    email: admin@superset.com
+    password: admin
+
+# PostgreSQL (metadata database)
+postgresql:
+  enabled: true
+  auth:
+    username: superset
+    password: superset
+    database: superset
+  primary:
+    persistence:
+      enabled: true
+      storageClass: pd-balanced
+      size: 8Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+
+# Redis (for caching and Celery)
+redis:
+  enabled: true
+  master:
+    persistence:
+      enabled: true
+      storageClass: pd-balanced
+      size: 8Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 8088
+
+# Ingress (optional - configure based on your needs)
+ingress:
+  enabled: false
+
+# Environment variables
+extraEnv:
+  ROW_LIMIT: "5000"
+  SUPERSET_LOAD_EXAMPLES: "no"
+
+# Security
+configOverrides:
+  secret: |
+    SECRET_KEY = 'CHANGE_ME_TO_A_COMPLEX_RANDOM_SECRET'
+
+# Celery workers for async queries (optional)
+supersetWorker:
+  enabled: true
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+  nodeSelector:
+    workload: app
+  tolerations:
+    - key: "cloud.google.com/gke-spot"
+      operator: "Equal"
+      value: "true"
+      effect: "NoSchedule"
+
+# Health checks
+livenessProbe:
+  enabled: true
+  path: /health
+  initialDelaySeconds: 60
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+  successThreshold: 1
+
+readinessProbe:
+  enabled: true
+  path: /health
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+  successThreshold: 1

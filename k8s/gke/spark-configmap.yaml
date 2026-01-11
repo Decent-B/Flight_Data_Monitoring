@@ -1,0 +1,19 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spark-config
+  namespace: spark
+data:
+  KAFKA_BOOTSTRAP_SERVERS: "kafka.kafka.svc.cluster.local:9092"
+  KAFKA_TOPIC_INPUT: "flights_raw"
+  KAFKA_TOPIC_OUTPUT: "flight_data"
+  CASSANDRA_HOST: "cassandra.cassandra.svc.cluster.local"
+  CASSANDRA_PORT: "9042"
+  CASSANDRA_KEYSPACE: "flight_analytics"
+  CASSANDRA_DATACENTER: "DC1-GKE"
+  GCS_BUCKET: "gs://REPLACE_WITH_YOUR_BUCKET"
+  GCS_CHECKPOINT_PATH: "gs://REPLACE_WITH_YOUR_BUCKET/checkpoints/spark-streaming"
+  SPARK_MASTER: "local[2]"
+  SPARK_APP_NAME: "FlightDataStreaming"
+  LOG_LEVEL: "WARN"

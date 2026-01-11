@@ -1,0 +1,183 @@
+# Cassandra StatefulSet for EKS
+# 3-node Cassandra cluster with proper resource allocation
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cassandra
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cassandra
+  namespace: cassandra
+  labels:
+    app: cassandra
+spec:
+  clusterIP: None
+  ports:
+  - port: 9042
+    name: cql
+  - port: 7000
+    name: intra-node
+  - port: 7001
+    name: tls-intra-node
+  - port: 7199
+    name: jmx
+  selector:
+    app: cassandra
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: cassandra
+  namespace: cassandra
+spec:
+  serviceName: cassandra
+  replicas: 3
+  selector:
+    matchLabels:
+      app: cassandra
+  template:
+    metadata:
+      labels:
+        app: cassandra
+    spec:
+      # Schedule on data nodes
+      nodeSelector:
+        role: data
+      
+      # Spread across nodes for HA
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: cassandra
+              topologyKey: kubernetes.io/hostname
+      
+      # Termination grace period for clean shutdown
+      terminationGracePeriodSeconds: 1800
+      
+      containers:
+      - name: cassandra
+        image: cassandra:4.1
+        ports:
+        - containerPort: 7000
+          name: intra-node
+        - containerPort: 7001
+          name: tls-intra-node
+        - containerPort: 7199
+          name: jmx
+        - containerPort: 9042
+          name: cql
+        
+        # Resources for t3.large (2 vCPU, 8Gi RAM)
+        resources:
+          requests:
+            cpu: "1"
+            memory: 4Gi
+          limits:
+            cpu: "2"
+            memory: 6Gi
+        
+        # Security context
+        securityContext:
+          capabilities:
+            add:
+              - IPC_LOCK
+          runAsUser: 999
+          runAsGroup: 999
+        
+        # Environment variables
+        env:
+        # Heap settings - 50% of memory limit
+        - name: MAX_HEAP_SIZE
+          value: "2G"
+        - name: HEAP_NEWSIZE
+          value: "512M"
+        
+        # Cluster settings
+        - name: CASSANDRA_CLUSTER_NAME
+          value: "FlightAnalyticsEKS"
+        - name: CASSANDRA_DC
+          value: "dc1"
+        - name: CASSANDRA_RACK
+          value: "rack1"
+        - name: CASSANDRA_ENDPOINT_SNITCH
+          value: "GossipingPropertyFileSnitch"
+        - name: CASSANDRA_SEEDS
+          value: "cassandra-0.cassandra.cassandra.svc.cluster.local,cassandra-1.cassandra.cassandra.svc.cluster.local"
+        
+        # Get pod IP for broadcast
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: CASSANDRA_BROADCAST_ADDRESS
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        
+        # Volume mounts
+        volumeMounts:
+        - name: cassandra-data
+          mountPath: /var/lib/cassandra
+        
+        # Lifecycle hooks
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - nodetool drain
+        
+        # Readiness probe
+        readinessProbe:
+          exec:
+            command:
+            - /bin/bash
+            - -c
+            - |
+              if [[ $(nodetool status | grep -c "^UN") -ge 1 ]]; then
+                exit 0
+              else
+                exit 1
+              fi
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 10
+          failureThreshold: 10
+        
+        # Liveness probe
+        livenessProbe:
+          tcpSocket:
+            port: 9042
+          initialDelaySeconds: 120
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 5
+  
+  # Volume claim templates
+  volumeClaimTemplates:
+  - metadata:
+      name: cassandra-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: ebs-gp3-cassandra
+      resources:
+        requests:
+          storage: 20Gi
+---
+# Pod Disruption Budget for HA
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: cassandra-pdb
+  namespace: cassandra
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: cassandra

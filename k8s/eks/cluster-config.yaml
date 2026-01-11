@@ -1,0 +1,67 @@
+# EKS Cluster Configuration
+# This file defines the EKS cluster with node groups optimized for the Flight Data Monitoring pipeline.
+# 
+# Usage:
+#   eksctl create cluster -f k8s/eks/cluster-config.yaml
+#
+# Node Groups:
+#   - general-nodes: 3x t3.medium for all workloads (6 vCPU total)
+#
+# Region: us-east-1 (N. Virginia) - better availability and higher default quotas
+
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: flight-data-eks
+  region: us-east-1
+  version: "1.29"
+
+# IAM OIDC provider for service account IAM roles (IRSA)
+iam:
+  withOIDC: true
+
+# VPC configuration - use default VPC with public/private subnets
+vpc:
+  nat:
+    gateway: Single  # Cost-effective single NAT gateway
+
+# Managed node groups - optimized for us-east-1
+managedNodeGroups:
+  # General purpose nodes - runs all workloads
+  # Using t3.medium: 2 vCPU each, 3 nodes = 6 vCPU total
+  - name: general-nodes
+    instanceType: t3.medium
+    desiredCapacity: 3
+    minSize: 2
+    maxSize: 4
+    volumeSize: 50
+    volumeType: gp3
+    labels:
+      role: general
+      workload: all
+    tags:
+      Environment: production
+      Component: general
+    iam:
+      withAddonPolicies:
+        ebs: true
+
+# Add-ons
+addons:
+  - name: vpc-cni
+    version: latest
+  - name: coredns
+    version: latest
+  - name: kube-proxy
+    version: latest
+
+# CloudWatch logging
+cloudWatch:
+  clusterLogging:
+    enableTypes:
+      - api
+      - audit
+      - authenticator
+      - controllerManager
+      - scheduler

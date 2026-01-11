@@ -1,0 +1,103 @@
+# Trino Helm Values for EKS
+# Trino (formerly Presto) for querying Cassandra and S3
+#
+# Key features:
+# - 1 coordinator + 2 workers
+# - Cassandra and Hive (S3) catalogs
+# - Resource limits tuned for t3.medium nodes
+# - Query memory limits to prevent OOM
+
+server:
+  workers: 2
+  
+  config:
+    query:
+      maxMemory: "2GB"
+      maxMemoryPerNode: "1GB"
+    memory:
+      heapHeadroomPerNode: "512MB"
+  
+  coordinatorExtraConfig: |
+    query.max-total-memory=4GB
+    query.max-execution-time=30m
+    query.max-stage-count=100
+  
+  workerExtraConfig: |
+    query.max-memory-per-node=1GB
+
+# Coordinator resources
+coordinator:
+  jvm:
+    maxHeapSize: "2G"
+  
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: "1"
+      memory: 3Gi
+  
+  nodeSelector:
+    role: app
+
+# Worker resources
+worker:
+  jvm:
+    maxHeapSize: "2G"
+  
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: "1"
+      memory: 3Gi
+  
+  nodeSelector:
+    role: app
+
+# Catalogs
+catalogs:
+  # Cassandra catalog
+  cassandra: |
+    connector.name=cassandra
+    cassandra.contact-points=cassandra.cassandra.svc.cluster.local
+    cassandra.native-protocol-port=9042
+    cassandra.load-policy.dc-aware.local-dc=dc1
+    cassandra.consistency-level=LOCAL_QUORUM
+    cassandra.speculative-execution.limit=2
+    cassandra.speculative-execution.delay=500ms
+  
+  # S3/Hive catalog (for archived data)
+  hive: |
+    connector.name=hive
+    hive.metastore=file
+    hive.metastore.catalog.dir=s3a://flight-data-checkpoints/hive-metastore
+    hive.s3.path-style-access=true
+    hive.s3.ssl.enabled=true
+    hive.non-managed-table-writes-enabled=true
+
+# Additional config files
+additionalConfigProperties:
+  - log.max-history=7
+  - log.max-size=100MB
+
+# Service
+service:
+  type: ClusterIP
+  port: 8080
+
+# Ingress (optional - for external access)
+ingress:
+  enabled: false
+
+# Security context
+securityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
