@@ -458,7 +458,7 @@ def update_oauth2_controller_services(nifi_url, token, verify_ssl, pg_id, client
                 svc.get('id'),
                 token,
                 verify_ssl,
-                {"Client secret": client_secret, "Client Secret": client_secret},
+                {"Client secret": client_secret},  # Only use lowercase 's' - the correct property name
                 allow_missing=True
             )
             if updated:
@@ -730,6 +730,10 @@ def main():
             for cs in controller_service_ids:
                 cs_revision = get_controller_service_revision(NIFI_API_BASE_URL, cs, token, not INSECURE)
                 start_controller_service_run_status(NIFI_API_BASE_URL, cs, cs_revision, token, not INSECURE)
+
+            # Update OAuth2 controller services with client secret
+            print("Updating OAuth2 controller services...")
+            update_oauth2_controller_services(NIFI_API_BASE_URL, token, not INSECURE, pg["id"], OPENSKY_CLIENT_SECRET)
 
             # Attempt to locate the created process group and schedule it
             time.sleep(2)

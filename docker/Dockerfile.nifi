@@ -18,6 +18,7 @@ ENV TRUSTSTORE_TYPE=JKS
 # User credentials
 ARG NIFI_USERNAME
 ARG NIFI_PASSWORD
+ARG OPENSKY_CLIENT_SECRET
 
 # Create the certs directory
 RUN mkdir -p ${CERTS_DIR}
