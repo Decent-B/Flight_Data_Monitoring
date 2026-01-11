@@ -319,79 +319,108 @@ def main():
                 else:
                     print("No parameter context")
 
-            if pg is None:
-                root_pg_id = canvas.get_root_pg_id()
-                print("Root PG id:", root_pg_id)
+            # if pg is None:
+            root_pg_id = canvas.get_root_pg_id()
+            print("Root PG id:", root_pg_id)
 
-                # Load flow content from file if exists
-                flow_file = Path(FLOW_PATH_HOST)
-                flow_content_dict = None
-                if flow_file.exists():
-                    print(f"Found existing flow content file at {flow_file}. Using it for import.")
-                    with open(flow_file, 'r') as f:
-                        flow_content_dict = json.load(f)
-                else:
-                    raise RuntimeError(f"Flow content file not found at {flow_file}")
+            # Load flow content from file if exists
+            flow_file = Path(f"/flows/{PG_NAME}.json")
+            flow_content_dict = None
+            if flow_file.exists():
+                print(f"Found existing flow content file at {flow_file}. Using it for import.")
+                with open(flow_file, 'r') as f:
+                    flow_content_dict = json.load(f)
+            else:
+                raise RuntimeError(f"Flow content file not found at {flow_file}")
 
-                # Create or get a registry bucket
-                BUCKET_NAME = "auto-deploy-bucket"
-                print("Ensuring Registry bucket exists:", BUCKET_NAME)
-                bucket_api = registry.apis.buckets_api.BucketsApi()
-                buckets = bucket_api.get_buckets()
-                bucket = None
-                if buckets:
-                    for b in buckets:
-                        if b.name == BUCKET_NAME:
-                            bucket = b
-                            break
-
-                if bucket is None:
-                    print("Creating registry bucket...")
-                    new_bucket = registry.models.Bucket(name=BUCKET_NAME)
-                    bucket = bucket_api.create_bucket(new_bucket)
-                    print("Created bucket:", bucket.identifier, bucket.name)
-                else:
-                    print("Found bucket:", bucket.identifier, bucket.name)
-
-                registry_client = versioning.get_registry_client('my-registry-client', 'name')
-                if registry_client is None:
-                    registry_client = versioning.create_registry_client(
-                        name='my-registry-client',
-                        uri=config.registry_config.host,
-                        description='Client for my flows'
-                    )
-
-                # Import the flow JSON into the bucket (using flow content JSON)
-                FLOW_NAME = PG_NAME # Name for the versioned flow in the Registry
-
-                # --- FLOW EXISTENCE CHECK & VERSIONING LOGIC (IDEMPOTENT) ---
-                # Check if flow container already exists in bucket
-                flow_list = registry.apis.bucket_flows_api.BucketFlowsApi().get_flows(bucket.identifier)
-                imported = None
-                for flow in flow_list:
-                    if flow.name == FLOW_NAME:
-                        imported = flow
+            # Create or get a registry bucket
+            BUCKET_NAME = "auto-deploy-bucket"
+            print("Ensuring Registry bucket exists:", BUCKET_NAME)
+            bucket_api = registry.apis.buckets_api.BucketsApi()
+            buckets = bucket_api.get_buckets()
+            bucket = None
+            if buckets:
+                for b in buckets:
+                    if b.name == BUCKET_NAME:
+                        bucket = b
                         break
 
+            if bucket is None:
+                print("Creating registry bucket...")
+                new_bucket = registry.models.Bucket(name=BUCKET_NAME)
+                bucket = bucket_api.create_bucket(new_bucket)
+                print("Created bucket:", bucket.identifier, bucket.name)
+            else:
+                print("Found bucket:", bucket.identifier, bucket.name)
 
-                if imported is None:
-                    # Case 1: Flow container does not exist. Create container and version 1.
-                    print(f"Flow '{FLOW_NAME}' not found. Creating new flow container and version 1.")
-                    
-                    flow_body = registry.models.VersionedFlow(
+            registry_client = versioning.get_registry_client('my-registry-client', 'name')
+            if registry_client is None:
+                registry_client = versioning.create_registry_client(
+                    name='my-registry-client',
+                    uri=config.registry_config.host,
+                    description='Client for my flows'
+                )
+
+            # Import the flow JSON into the bucket (using flow content JSON)
+            FLOW_NAME = PG_NAME # Name for the versioned flow in the Registry
+
+            # --- FLOW EXISTENCE CHECK & VERSIONING LOGIC (IDEMPOTENT) ---
+            # Check if flow container already exists in bucket
+            flow_list = registry.apis.bucket_flows_api.BucketFlowsApi().get_flows(bucket.identifier)
+            imported = None
+            for flow in flow_list:
+                if flow.name == FLOW_NAME:
+                    imported = flow
+                    break
+
+
+            if imported is None:
+                # Case 1: Flow container does not exist. Create container and version 1.
+                print(f"Flow '{FLOW_NAME}' not found. Creating new flow container and version 1.")
+                
+                flow_body = registry.models.VersionedFlow(
+                    bucket_identifier=bucket.identifier,
+                    bucket_name=bucket.name,
+                    name=FLOW_NAME,
+                    description='Initial import of flow content from NiFi root canvas.',
+                    type='Flow'
+                )
+                imported = registry.apis.bucket_flows_api.BucketFlowsApi().create_flow(
+                    body=flow_body,
+                    bucket_id=bucket.identifier
+                )
+                print("Imported flow container. Registry flow id:", imported.identifier)
+                
+                # Explicitly Save Version 1
+                versioned_flow_snapshot = registry.models.VersionedFlowSnapshot(
+                    flow_contents=flow_content_dict,
+                    snapshot_metadata=registry.models.VersionedFlowSnapshotMetadata(
+                        author="ankhanhtran02",
                         bucket_identifier=bucket.identifier,
-                        bucket_name=bucket.name,
-                        name=FLOW_NAME,
-                        description='Initial import of flow content from NiFi root canvas.',
-                        type='Flow'
+                        flow_identifier=imported.identifier,
                     )
-                    imported = registry.apis.bucket_flows_api.BucketFlowsApi().create_flow(
-                        body=flow_body,
-                        bucket_id=bucket.identifier
-                    )
-                    print("Imported flow container. Registry flow id:", imported.identifier)
+                )
+
+                versioned_flow_snapshot_json = utils.dump(versioned_flow_snapshot)
                     
-                    # Explicitly Save Version 1
+                saved_version = versioning.import_flow_version(
+                    bucket_id=bucket.identifier,
+                    flow_id=imported.identifier,
+                    encoded_flow=versioned_flow_snapshot_json,
+                )
+                version_number = saved_version.snapshot_metadata.version
+                print(f"Saved version {version_number} successfully.")
+
+            else:
+                # Case 2: Flow container exists. Check for change.
+                print(f"Flow '{FLOW_NAME}' found. Checking if new version is required.")
+                
+
+                versions = registry.apis.flows_api.FlowsApi().get_flow_versions1(imported.identifier)
+                
+                if not versions:
+                    # Fallback in case of a corrupted flow container (no versions)
+                    print("WARNING: Flow found but has no versions. Saving version 1.")
                     versioned_flow_snapshot = registry.models.VersionedFlowSnapshot(
                         flow_contents=flow_content_dict,
                         snapshot_metadata=registry.models.VersionedFlowSnapshotMetadata(
@@ -402,7 +431,6 @@ def main():
                     )
 
                     versioned_flow_snapshot_json = utils.dump(versioned_flow_snapshot)
-                        
                     saved_version = versioning.import_flow_version(
                         bucket_id=bucket.identifier,
                         flow_id=imported.identifier,
@@ -410,68 +438,40 @@ def main():
                     )
                     version_number = saved_version.snapshot_metadata.version
                     print(f"Saved version {version_number} successfully.")
+            
+            
 
-                else:
-                    # Case 2: Flow container exists. Check for change.
-                    print(f"Flow '{FLOW_NAME}' found. Checking if new version is required.")
-                    
+            token = get_nifi_token(f"{NIFI_API_BASE_URL}/nifi-api", NIFI_USER, NIFI_PASS, cert_path=not INSECURE)
+            print("Obtained NiFi token for upload.", token[:10] + "...")
 
-                    versions = registry.apis.flows_api.FlowsApi().get_flow_versions1(imported.identifier)
-                    
-                    if not versions:
-                        # Fallback in case of a corrupted flow container (no versions)
-                        print("WARNING: Flow found but has no versions. Saving version 1.")
-                        versioned_flow_snapshot = registry.models.VersionedFlowSnapshot(
-                            flow_contents=flow_content_dict,
-                            snapshot_metadata=registry.models.VersionedFlowSnapshotMetadata(
-                                author="ankhanhtran02",
-                                bucket_identifier=bucket.identifier,
-                                flow_identifier=imported.identifier,
-                            )
-                        )
+            # print(versioned_flow_snapshot_json)
+            pg = upload_flow_via_api(
+                nifi_url=NIFI_API_BASE_URL,
+                parent_pg_id=root_pg_id,
+                client_id=str(uuid.uuid4()),
+                file_path=flow_file,
+                group_name=PG_NAME,
+                token=token,
+                verify_ssl=not INSECURE
+            )
+            controller_service_ids = extract_controller_service_ids(pg)
+            print("Found controller services: ", controller_service_ids)
+            for cs in controller_service_ids:
+                cs_revision = get_controller_service_revision(NIFI_API_BASE_URL, cs, token, not INSECURE)
+                start_controller_service_run_status(NIFI_API_BASE_URL, cs, cs_revision, token, not INSECURE)
 
-                        versioned_flow_snapshot_json = utils.dump(versioned_flow_snapshot)
-                        saved_version = versioning.import_flow_version(
-                            bucket_id=bucket.identifier,
-                            flow_id=imported.identifier,
-                            encoded_flow=versioned_flow_snapshot_json,
-                        )
-                        version_number = saved_version.snapshot_metadata.version
-                        print(f"Saved version {version_number} successfully.")
-                
-                
-
-                token = get_nifi_token(f"{NIFI_API_BASE_URL}/nifi-api", NIFI_USER, NIFI_PASS, cert_path=not INSECURE)
-                print("Obtained NiFi token for upload.", token[:10] + "...")
-
-                # print(versioned_flow_snapshot_json)
-                pg = upload_flow_via_api(
-                    nifi_url=NIFI_API_BASE_URL,
-                    parent_pg_id=root_pg_id,
-                    client_id=str(uuid.uuid4()),
-                    file_path=FLOW_PATH_HOST,
-                    group_name=PG_NAME,
-                    token=token,
-                    verify_ssl=not INSECURE
-                )
-                controller_service_ids = extract_controller_service_ids(pg)
-                print("Found controller services: ", controller_service_ids)
-                for cs in controller_service_ids:
-                    cs_revision = get_controller_service_revision(NIFI_API_BASE_URL, cs, token, not INSECURE)
-                    start_controller_service_run_status(NIFI_API_BASE_URL, cs, cs_revision, token, not INSECURE)
-
-                # Attempt to locate the created process group and schedule it
-                time.sleep(2)
-                # find process groups with our name under root
-                new_pg = canvas.get_process_group(pg["id"], 'id', False)
-                if new_pg is None:
-                    raise RuntimeError("Failed to find the instantiated process group after deployment.")
-                else:
-                    print("Found instantiated process group:", new_pg.id, new_pg.component.name)
-                
+            # Attempt to locate the created process group and schedule it
+            time.sleep(2)
+            # find process groups with our name under root
+            new_pg = canvas.get_process_group(pg["id"], 'id', False)
+            if new_pg is None:
+                raise RuntimeError("Failed to find the instantiated process group after deployment.")
             else:
-                print("Process group already exists:", pg.id)
-                new_pg = pg
+                print("Found instantiated process group:", new_pg.id, new_pg.component.name)
+                
+            # else:
+            #     print("Process group already exists:", pg.id)
+            #     new_pg = pg
 
             print("Scheduling (starting) process group:", new_pg.id)
             canvas.schedule_process_group(new_pg.id, True)
