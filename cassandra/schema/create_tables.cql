@@ -7,6 +7,7 @@ USE flight_analytics;
 -- Table 1: aircrafts_by_icao24
 -- Supports Q2: Per-Aircraft Current State
 -- Stores the latest known state for each aircraft
+DROP TABLE IF EXISTS aircrafts_by_icao24;
 CREATE TABLE IF NOT EXISTS aircrafts_by_icao24 (
     icao24 text,
     callsign text,
@@ -18,6 +19,7 @@ CREATE TABLE IF NOT EXISTS aircrafts_by_icao24 (
 -- Table 2: aircraftstates_by_icao24
 -- Supports Q3: Per-Aircraft Time Series (Flight Tracks)
 -- Stores flight tracks with waypoints partitioned by aircraft and flight start time
+DROP TABLE IF EXISTS aircraftstates_by_icao24;
 CREATE TABLE IF NOT EXISTS aircraftstates_by_icao24 (
     icao24 text,
     starttime bigint,          -- FlightTrack.startTime (identifies the flight)
@@ -58,6 +60,7 @@ DROP TABLE IF EXISTS trafficdensity_by_cell_minute;
 -- Table 5: activeaircraft_by_country_hour
 -- Supports Q5: Hourly Active Aircraft per Country/Global
 -- Stores hourly active aircraft counts by country
+DROP TABLE IF EXISTS activeaircraft_by_country_hour;
 CREATE TABLE IF NOT EXISTS activeaircraft_by_country_hour (
     country_code text,
     hour_bucket bigint,
@@ -68,6 +71,7 @@ CREATE TABLE IF NOT EXISTS activeaircraft_by_country_hour (
 -- Table 6: departures_by_country_hour
 -- Supports Q6: Hourly Departures per Country/Global
 -- Stores hourly departure counts by country
+DROP TABLE IF EXISTS departures_by_country_hour;
 CREATE TABLE IF NOT EXISTS departures_by_country_hour (
     country_code text,
     hour_bucket bigint,
@@ -78,6 +82,7 @@ CREATE TABLE IF NOT EXISTS departures_by_country_hour (
 -- Table 7: arrivals_by_country_hour
 -- Supports Q7: Hourly Arrivals per Country/Global
 -- Stores hourly arrival counts by country
+DROP TABLE IF EXISTS arrivals_by_country_hour;
 CREATE TABLE IF NOT EXISTS arrivals_by_country_hour (
     country_code text,
     hour_bucket bigint,

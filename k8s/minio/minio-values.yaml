@@ -1,0 +1,22 @@
+mode: standalone
+replicas: 1
+
+rootUser: minioadmin
+rootPassword: minioadmin123
+
+persistence:
+  size: 10Gi
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+buckets:
+  - name: flight-raw
+  - name: flight-data
+  - name: flight-tracks
+  - name: checkpoints

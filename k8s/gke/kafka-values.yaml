@@ -1,0 +1,118 @@
+# Kafka Helm Values for GKE
+# Using Bitnami Kafka Chart
+
+replicaCount: 3
+
+image:
+  registry: docker.io
+  repository: bitnami/kafka
+  tag: 3.6.1-debian-12-r0
+
+# Use KRaft mode (no ZooKeeper)
+kraft:
+  enabled: true
+
+# Resource configuration
+resources:
+  requests:
+    cpu: 500m
+    memory: 2Gi
+  limits:
+    cpu: 1000m
+    memory: 3Gi
+
+# Persistence
+persistence:
+  enabled: true
+  storageClass: "pd-ssd"
+  size: 10Gi
+  accessModes:
+    - ReadWriteOnce
+
+# Service configuration
+service:
+  type: ClusterIP
+  ports:
+    client: 9092
+    internal: 9093
+    controller: 9094
+
+# Kafka configuration
+config: |
+  # Log retention
+  log.retention.hours=24
+  log.retention.bytes=1073741824
+  log.segment.bytes=536870912
+  
+  # Performance
+  num.network.threads=3
+  num.io.threads=8
+  socket.send.buffer.bytes=102400
+  socket.receive.buffer.bytes=102400
+  socket.request.max.bytes=104857600
+  
+  # Replication
+  default.replication.factor=3
+  min.insync.replicas=2
+  
+  # Cleanup
+  log.cleanup.policy=delete
+  log.cleaner.enable=true
+
+# Node affinity for kafka-pool
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: workload
+          operator: In
+          values:
+          - kafka
+
+# Tolerations for kafka-pool taint
+tolerations:
+  - key: "workload"
+    operator: "Equal"
+    value: "kafka"
+    effect: "NoSchedule"
+
+# Anti-affinity to spread brokers across nodes
+podAntiAffinity:
+  preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 100
+      podAffinityTerm:
+        labelSelector:
+          matchExpressions:
+            - key: app.kubernetes.io/name
+              operator: In
+              values:
+                - kafka
+        topologyKey: kubernetes.io/hostname
+
+# JVM settings
+heapOpts: "-Xms1g -Xmx2g"
+
+# Liveness and readiness probes
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+  successThreshold: 1
+
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+  successThreshold: 1
+
+# Metrics
+metrics:
+  kafka:
+    enabled: true
+  jmx:
+    enabled: true

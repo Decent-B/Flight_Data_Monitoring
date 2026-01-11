@@ -1,0 +1,126 @@
+# Trino Helm Values for GKE
+
+image:
+  repository: trinodb/trino
+  tag: "435"
+  pullPolicy: IfNotPresent
+
+server:
+  workers: 2
+  node:
+    environment: production
+    dataDir: /data/trino
+    pluginDir: /usr/lib/trino/plugin
+
+coordinator:
+  jvm:
+    maxHeapSize: "2G"
+    gcMethod:
+      type: "UseG1GC"
+      g1:
+        heapRegionSize: "32M"
+  
+  config:
+    memory:
+      heapHeadroomPerNode: "1GB"
+    query:
+      maxMemory: "2GB"
+      maxMemoryPerNode: "512MB"
+  
+  resources:
+    requests:
+      memory: "2Gi"
+      cpu: "500m"
+    limits:
+      memory: "3Gi"
+      cpu: "1000m"
+  
+  nodeSelector:
+    workload: app
+  
+  tolerations:
+    - key: "cloud.google.com/gke-spot"
+      operator: "Equal"
+      value: "true"
+      effect: "NoSchedule"
+
+  livenessProbe:
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 6
+    successThreshold: 1
+  
+  readinessProbe:
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 6
+    successThreshold: 1
+
+worker:
+  jvm:
+    maxHeapSize: "2G"
+    gcMethod:
+      type: "UseG1GC"
+      g1:
+        heapRegionSize: "32M"
+  
+  config:
+    memory:
+      heapHeadroomPerNode: "1GB"
+    query:
+      maxMemoryPerNode: "512MB"
+  
+  resources:
+    requests:
+      memory: "2Gi"
+      cpu: "500m"
+    limits:
+      memory: "3Gi"
+      cpu: "1000m"
+  
+  nodeSelector:
+    workload: app
+  
+  tolerations:
+    - key: "cloud.google.com/gke-spot"
+      operator: "Equal"
+      value: "true"
+      effect: "NoSchedule"
+  
+  livenessProbe:
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 6
+    successThreshold: 1
+  
+  readinessProbe:
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 6
+    successThreshold: 1
+
+service:
+  type: ClusterIP
+  port: 8080
+
+additionalCatalogs:
+  cassandra: |
+    connector.name=cassandra
+    cassandra.contact-points=cassandra.cassandra.svc.cluster.local
+    cassandra.load-policy.dc-aware.local-dc=DC1-GKE
+    cassandra.allow-drop-table=true
+    cassandra.protocol-version=V4
+
+# Service configuration
+serviceAccount:
+  create: true
+  name: trino
+
+# Enable JMX for monitoring (optional)
+jmx:
+  enabled: true
+  port: 9080

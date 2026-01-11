@@ -1,0 +1,86 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: producer-config
+  namespace: producer
+data:
+  KAFKA_BOOTSTRAP_SERVERS: "kafka.kafka.svc.cluster.local:9092"
+  KAFKA_TOPIC: "flights_raw"
+  OPENSKY_API_URL: "https://opensky-network.org/api/states/all"
+  FETCH_INTERVAL: "60"
+  LOG_LEVEL: "INFO"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka-producer
+  namespace: producer
+  labels:
+    app: kafka-producer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka-producer
+  template:
+    metadata:
+      labels:
+        app: kafka-producer
+    spec:
+      containers:
+      - name: producer
+        image: REPLACE_WITH_GCP_REGION-docker.pkg.dev/REPLACE_WITH_PROJECT_ID/flight-data/producer:latest
+        imagePullPolicy: Always
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 250m
+            memory: 512Mi
+        env:
+          - name: KAFKA_BOOTSTRAP_SERVERS
+            valueFrom:
+              configMapKeyRef:
+                name: producer-config
+                key: KAFKA_BOOTSTRAP_SERVERS
+          - name: KAFKA_TOPIC
+            valueFrom:
+              configMapKeyRef:
+                name: producer-config
+                key: KAFKA_TOPIC
+          - name: OPENSKY_API_URL
+            valueFrom:
+              configMapKeyRef:
+                name: producer-config
+                key: OPENSKY_API_URL
+          - name: FETCH_INTERVAL
+            valueFrom:
+              configMapKeyRef:
+                name: producer-config
+                key: FETCH_INTERVAL
+          - name: LOG_LEVEL
+            valueFrom:
+              configMapKeyRef:
+                name: producer-config
+                key: LOG_LEVEL
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - ps aux | grep python
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - ps aux | grep python
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5

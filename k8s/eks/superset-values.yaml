@@ -1,0 +1,137 @@
+# Superset Helm Values for EKS
+# Apache Superset for data visualization
+#
+# Key features:
+# - Single replica for cost efficiency
+# - PostgreSQL and Redis for metadata/caching
+# - Pre-configured Trino database connection
+# - Resource limits tuned for t3.medium nodes
+
+# Image
+image:
+  repository: apache/superset
+  tag: "3.0.0"
+  pullPolicy: IfNotPresent
+
+# Replicas
+replicaCount: 1
+
+# Resources
+resources:
+  requests:
+    cpu: 250m
+    memory: 1Gi
+  limits:
+    cpu: 500m
+    memory: 2Gi
+
+# Node selector
+nodeSelector:
+  role: app
+
+# Superset configuration
+configOverrides:
+  secret: |
+    SECRET_KEY = 'CHANGE_ME_TO_A_COMPLEX_RANDOM_SECRET'
+  
+  # Enable Trino support
+  db_engines: |
+    from superset.db_engine_specs.trino import TrinoEngineSpec
+    
+  # Feature flags
+  feature_flags: |
+    FEATURE_FLAGS = {
+        "ENABLE_TEMPLATE_PROCESSING": True,
+        "DASHBOARD_NATIVE_FILTERS": True,
+        "DASHBOARD_CROSS_FILTERS": True,
+        "ENABLE_JAVASCRIPT_CONTROLS": False,
+        "DASHBOARD_RBAC": True,
+    }
+  
+  # Cache configuration
+  cache: |
+    CACHE_CONFIG = {
+        'CACHE_TYPE': 'RedisCache',
+        'CACHE_DEFAULT_TIMEOUT': 300,
+        'CACHE_KEY_PREFIX': 'superset_',
+        'CACHE_REDIS_URL': 'redis://superset-redis:6379/0'
+    }
+    
+    DATA_CACHE_CONFIG = {
+        'CACHE_TYPE': 'RedisCache',
+        'CACHE_DEFAULT_TIMEOUT': 86400,
+        'CACHE_KEY_PREFIX': 'superset_data_',
+        'CACHE_REDIS_URL': 'redis://superset-redis:6379/1'
+    }
+
+# Init job for database setup
+init:
+  createAdmin: true
+  adminUser:
+    username: admin
+    firstname: Admin
+    lastname: User
+    email: admin@superset.local
+    password: admin
+  
+  # Load example dashboards
+  loadExamples: false
+
+# PostgreSQL subchart
+postgresql:
+  enabled: true
+  auth:
+    username: superset
+    password: superset
+    database: superset
+  primary:
+    persistence:
+      enabled: true
+      size: 5Gi
+      storageClass: ebs-gp3
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 250m
+        memory: 512Mi
+
+# Redis subchart
+redis:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: true
+      size: 2Gi
+      storageClass: ebs-gp3
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+
+# Service
+service:
+  type: ClusterIP
+  port: 8088
+
+# Ingress (optional)
+ingress:
+  enabled: false
+
+# Extra environment variables for Trino connection
+extraEnv:
+  - name: TRINO_HOST
+    value: "trino-coordinator.trino.svc.cluster.local"
+  - name: TRINO_PORT
+    value: "8080"
+
+# Database connections to add (via Superset API or UI)
+# After deployment, add Trino connection:
+# SQLAlchemy URI: trino://trino-coordinator.trino.svc.cluster.local:8080/cassandra

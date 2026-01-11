@@ -1,0 +1,33 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "minikube": true,
+        "kubectl config": true,
+        "kubectl get": true,
+        "kubectl logs": true,
+        "kubectl wait": true,
+        "kubectl exec": true,
+        "kubectl describe": true,
+        "kubectl delete": true,
+        "kubectl rollout": true,
+        "kubectl port-forward": true,
+        "/^sleep 3 && cd /home/binh/Coding/Flight_Data_Monitoring && source \\.venv/bin/activate && python kafka/test_producer\\.py --messages 20 --topic flights_raw 2>&1$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^cd /home/binh/Coding/Flight_Data_Monitoring && source \\.venv/bin/activate && python kafka/test_producer\\.py --messages 20 --topic flights_raw 2>&1$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^python kafka/test_producer\\.py --messages 20 --topic flights_raw$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "pkill": true,
+        "kubectl top": true,
+        "kubectl scale": true,
+        "helm": true,
+        "aws": true,
+        "eksctl": true,
+        "kubectl cluster-info": true
+    }
+}

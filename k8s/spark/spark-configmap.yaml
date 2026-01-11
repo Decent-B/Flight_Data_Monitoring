@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spark-stream-config
+  namespace: spark
+data:
+  KAFKA_BOOTSTRAP_SERVERS: "kafka-broker-headless.kafka.svc.cluster.local:9092"
+  CASSANDRA_HOSTS: "cassandra.default.svc.cluster.local"
+  CASSANDRA_PORT: "9042"
+  MINIO_ENDPOINT: "http://minio.minio.svc.cluster.local:9000"
+  MINIO_SSL_ENABLED: "false"
+  MINIO_PATH_STYLE_ACCESS: "true"
+  SPARK_CHECKPOINT_PATH: "s3a://checkpoints/"
+  BUCKET_FLIGHT_RAW: "s3a://flight-raw/"
+  BUCKET_FLIGHT_DATA: "s3a://flight-data/"
+  BUCKET_FLIGHT_TRACKS: "s3a://flight-tracks/"
