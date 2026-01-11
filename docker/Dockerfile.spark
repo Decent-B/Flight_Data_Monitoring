@@ -2,6 +2,9 @@ FROM apache/spark-py:v3.4.0
  
 USER root
  
+# Ensure spark user exists with proper entry in /etc/passwd for Hadoop authentication
+RUN getent passwd 185 || useradd -u 185 -g 0 -d /opt/spark -s /bin/bash spark
+
 # Install Python dependencies
 RUN pip install --no-cache-dir confluent-kafka requests python-dateutil airportsdata pycountry pyarrow pandas reverse_geocode
  
@@ -27,6 +30,5 @@ WORKDIR /opt/spark/work-dir
 # Switch back to spark user
 USER 185
  
-# Default command (will be overridden by docker-compose)
+# Default command (will be overridden by docker-compose or K8s)
 CMD ["/opt/spark/bin/spark-submit", "/app/spark/reader.py"]
-CMD ["/opt/spark/bin/spark-submit", "/app/spark/weather_processor.py"]

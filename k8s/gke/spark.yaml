@@ -1,0 +1,225 @@
+---
+# Spark Namespace (if not exists)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: spark
+---
+# ServiceAccount for Spark
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: spark-sa
+  namespace: spark
+---
+# Spark ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spark-config
+  namespace: spark
+data:
+  # Kafka configuration
+  KAFKA_BOOTSTRAP_SERVERS: "kafka-headless.kafka.svc.cluster.local:9092"
+  
+  # Cassandra configuration
+  CASSANDRA_HOSTS: "cassandra.cassandra.svc.cluster.local"
+  CASSANDRA_PORT: "9042"
+  CASSANDRA_KEYSPACE: "flight_analytics"
+  
+  # MinIO configuration (S3-compatible)
+  MINIO_ENDPOINT: "http://minio.minio.svc.cluster.local:9000"
+  MINIO_SSL_ENABLED: "false"
+  MINIO_PATH_STYLE_ACCESS: "true"
+  
+  # Checkpoint paths (MinIO S3A)
+  SPARK_CHECKPOINT_PATH: "s3a://checkpoints/"
+  BUCKET_FLIGHT_RAW: "s3a://flight-raw/"
+  BUCKET_FLIGHT_DATA: "s3a://flight-data/"
+  BUCKET_FLIGHT_TRACKS: "s3a://flight-tracks/"
+---
+# Spark Secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: spark-secret
+  namespace: spark
+type: Opaque
+stringData:
+  CASSANDRA_USERNAME: "cassandra"
+  CASSANDRA_PASSWORD: "cassandra"
+  MINIO_ACCESS_KEY: "minioadmin"
+  MINIO_SECRET_KEY: "minioadmin123"
+---
+# Spark Flight Reader Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spark-flight-reader
+  namespace: spark
+  labels:
+    app: spark-flight-reader
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spark-flight-reader
+  template:
+    metadata:
+      labels:
+        app: spark-flight-reader
+    spec:
+      serviceAccountName: spark-sa
+      # Allow scheduling on kafka pool nodes
+      tolerations:
+        - key: "workload"
+          operator: "Equal"
+          value: "kafka"
+          effect: "NoSchedule"
+      containers:
+      - name: spark-flight-reader
+        image: asia-southeast1-docker.pkg.dev/fluted-lambda-456115-s9/flight-data/spark:v3
+        imagePullPolicy: Always
+        command:
+          - /bin/bash
+          - -c
+          - |
+            /opt/spark/bin/spark-submit \
+              --master local[2] \
+              --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.0,com.datastax.spark:spark-cassandra-connector_2.12:3.4.1,org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262 \
+              --conf spark.jars.ivy=/tmp/.ivy2 \
+              --conf spark.sql.streaming.checkpointLocation=${SPARK_CHECKPOINT_PATH} \
+              --conf spark.hadoop.fs.s3a.endpoint=${MINIO_ENDPOINT} \
+              --conf spark.hadoop.fs.s3a.access.key=${MINIO_ACCESS_KEY} \
+              --conf spark.hadoop.fs.s3a.secret.key=${MINIO_SECRET_KEY} \
+              --conf spark.hadoop.fs.s3a.path.style.access=true \
+              --conf spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem \
+              --conf spark.hadoop.fs.s3a.connection.ssl.enabled=false \
+              --conf spark.cassandra.connection.host=${CASSANDRA_HOSTS} \
+              --conf spark.cassandra.connection.port=${CASSANDRA_PORT} \
+              --conf spark.cassandra.auth.username=${CASSANDRA_USERNAME} \
+              --conf spark.cassandra.auth.password=${CASSANDRA_PASSWORD} \
+              --conf spark.cassandra.connection.keepAliveMS=60000 \
+              --conf spark.driver.memory=2g \
+              --conf spark.executor.memory=1g \
+              --conf spark.sql.adaptive.enabled=true \
+              --conf spark.streaming.stopGracefullyOnShutdown=true \
+              /app/spark/reader.py
+        resources:
+          requests:
+            cpu: 500m
+            memory: 2Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        env:
+          # Kafka
+          - name: KAFKA_BOOTSTRAP_SERVERS
+            valueFrom:
+              configMapKeyRef:
+                name: spark-config
+                key: KAFKA_BOOTSTRAP_SERVERS
+          # Cassandra
+          - name: CASSANDRA_HOSTS
+            valueFrom:
+              configMapKeyRef:
+                name: spark-config
+                key: CASSANDRA_HOSTS
+          - name: CASSANDRA_PORT
+            valueFrom:
+              configMapKeyRef:
+                name: spark-config
+                key: CASSANDRA_PORT
+          - name: CASSANDRA_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: spark-secret
+                key: CASSANDRA_USERNAME
+          - name: CASSANDRA_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: spark-secret
+                key: CASSANDRA_PASSWORD
+          # MinIO
+          - name: MINIO_ENDPOINT
+            valueFrom:
+              configMapKeyRef:
+                name: spark-config
+                key: MINIO_ENDPOINT
+          - name: MINIO_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                name: spark-secret
+                key: MINIO_ACCESS_KEY
+          - name: MINIO_SECRET_KEY
+            valueFrom:
+              secretKeyRef:
+                name: spark-secret
+                key: MINIO_SECRET_KEY
+          - name: MINIO_SSL_ENABLED
+            valueFrom:
+              configMapKeyRef:
+                name: spark-config
+                key: MINIO_SSL_ENABLED
+          - name: MINIO_PATH_STYLE_ACCESS
+            valueFrom:
+              configMapKeyRef:
+                name: spark-config
+                key: MINIO_PATH_STYLE_ACCESS
+          # Checkpoint paths
+          - name: SPARK_CHECKPOINT_PATH
+            valueFrom:
+              configMapKeyRef:
+                name: spark-config
+                key: SPARK_CHECKPOINT_PATH
+          - name: BUCKET_FLIGHT_RAW
+            valueFrom:
+              configMapKeyRef:
+                name: spark-config
+                key: BUCKET_FLIGHT_RAW
+          - name: BUCKET_FLIGHT_DATA
+            valueFrom:
+              configMapKeyRef:
+                name: spark-config
+                key: BUCKET_FLIGHT_DATA
+          - name: BUCKET_FLIGHT_TRACKS
+            valueFrom:
+              configMapKeyRef:
+                name: spark-config
+                key: BUCKET_FLIGHT_TRACKS
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pgrep -f spark-submit || exit 1
+          initialDelaySeconds: 120
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pgrep -f spark-submit || exit 1
+          initialDelaySeconds: 60
+          periodSeconds: 15
+          timeoutSeconds: 5
+---
+# Spark UI Service (optional, for debugging)
+apiVersion: v1
+kind: Service
+metadata:
+  name: spark-ui
+  namespace: spark
+  labels:
+    app: spark-flight-reader
+spec:
+  type: ClusterIP
+  ports:
+    - name: spark-ui
+      port: 4040
+      targetPort: 4040
+  selector:
+    app: spark-flight-reader

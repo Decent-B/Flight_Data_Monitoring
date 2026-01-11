@@ -1,0 +1,123 @@
+# Cassandra deployment for GKE - Flight Data Monitoring
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cassandra
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cassandra-headless
+  namespace: cassandra
+  labels:
+    app: cassandra
+spec:
+  clusterIP: None
+  ports:
+    - port: 9042
+      name: cql
+    - port: 7000
+      name: intra-node
+    - port: 7001
+      name: tls-intra-node
+  selector:
+    app: cassandra
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cassandra
+  namespace: cassandra
+  labels:
+    app: cassandra
+spec:
+  ports:
+    - port: 9042
+      name: cql
+  selector:
+    app: cassandra
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: cassandra
+  namespace: cassandra
+spec:
+  serviceName: cassandra-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cassandra
+  template:
+    metadata:
+      labels:
+        app: cassandra
+    spec:
+      terminationGracePeriodSeconds: 120
+      containers:
+        - name: cassandra
+          image: cassandra:4.1
+          ports:
+            - containerPort: 7000
+              name: intra-node
+            - containerPort: 7001
+              name: tls-intra-node
+            - containerPort: 7199
+              name: jmx
+            - containerPort: 9042
+              name: cql
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: MAX_HEAP_SIZE
+              value: "256M"
+            - name: HEAP_NEWSIZE
+              value: "64M"
+            - name: CASSANDRA_CLUSTER_NAME
+              value: "FlightAnalytics"
+            - name: CASSANDRA_DC
+              value: "gke-dc1"
+            - name: CASSANDRA_RACK
+              value: "rack1"
+            - name: CASSANDRA_ENDPOINT_SNITCH
+              value: "GossipingPropertyFileSnitch"
+            - name: CASSANDRA_SEEDS
+              value: "cassandra-0.cassandra-headless.cassandra.svc.cluster.local"
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          volumeMounts:
+            - name: cassandra-data
+              mountPath: /var/lib/cassandra
+          readinessProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - cqlsh -e "DESCRIBE KEYSPACES" 2>/dev/null
+            initialDelaySeconds: 90
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 10
+          livenessProbe:
+            tcpSocket:
+              port: 9042
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            timeoutSeconds: 10
+  volumeClaimTemplates:
+    - metadata:
+        name: cassandra-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: pd-ssd
+        resources:
+          requests:
+            storage: 10Gi

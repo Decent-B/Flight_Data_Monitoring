@@ -1,0 +1,181 @@
+---
+# MinIO Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: minio
+---
+# MinIO Secret for credentials
+apiVersion: v1
+kind: Secret
+metadata:
+  name: minio-secret
+  namespace: minio
+type: Opaque
+stringData:
+  MINIO_ROOT_USER: "minioadmin"
+  MINIO_ROOT_PASSWORD: "minioadmin123"
+---
+# MinIO ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: minio-config
+  namespace: minio
+data:
+  # Bucket names to create
+  BUCKETS: "flight-raw,flight-data,flight-tracks,checkpoints"
+---
+# MinIO PersistentVolumeClaim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: minio-pvc
+  namespace: minio
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: standard-rwo
+  resources:
+    requests:
+      storage: 20Gi
+---
+# MinIO Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio
+  namespace: minio
+  labels:
+    app: minio
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minio
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: minio
+    spec:
+      containers:
+      - name: minio
+        image: minio/minio:latest
+        args:
+          - server
+          - /data
+          - --console-address
+          - ":9090"
+        ports:
+          - name: api
+            containerPort: 9000
+          - name: console
+            containerPort: 9090
+        env:
+          - name: MINIO_ROOT_USER
+            valueFrom:
+              secretKeyRef:
+                name: minio-secret
+                key: MINIO_ROOT_USER
+          - name: MINIO_ROOT_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: minio-secret
+                key: MINIO_ROOT_PASSWORD
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        volumeMounts:
+          - name: minio-storage
+            mountPath: /data
+        livenessProbe:
+          httpGet:
+            path: /minio/health/live
+            port: 9000
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /minio/health/ready
+            port: 9000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+      volumes:
+        - name: minio-storage
+          persistentVolumeClaim:
+            claimName: minio-pvc
+---
+# MinIO Service (ClusterIP for internal access)
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+  namespace: minio
+  labels:
+    app: minio
+spec:
+  type: ClusterIP
+  ports:
+    - name: api
+      port: 9000
+      targetPort: 9000
+    - name: console
+      port: 9090
+      targetPort: 9090
+  selector:
+    app: minio
+---
+# MinIO Init Job - Creates buckets
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-init
+  namespace: minio
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 5
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: minio-mc
+        image: minio/mc:latest
+        env:
+          - name: MINIO_ROOT_USER
+            valueFrom:
+              secretKeyRef:
+                name: minio-secret
+                key: MINIO_ROOT_USER
+          - name: MINIO_ROOT_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: minio-secret
+                key: MINIO_ROOT_PASSWORD
+        command:
+          - /bin/sh
+          - -c
+          - |
+            echo "Waiting for MinIO to be ready..."
+            sleep 15
+            
+            echo "Configuring MinIO client..."
+            mc alias set myminio http://minio.minio.svc.cluster.local:9000 $MINIO_ROOT_USER $MINIO_ROOT_PASSWORD
+            
+            echo "Creating buckets..."
+            mc mb myminio/flight-raw --ignore-existing
+            mc mb myminio/flight-data --ignore-existing
+            mc mb myminio/flight-tracks --ignore-existing
+            mc mb myminio/checkpoints --ignore-existing
+            
+            echo "Listing buckets..."
+            mc ls myminio/
+            
+            echo "MinIO initialization completed successfully!"

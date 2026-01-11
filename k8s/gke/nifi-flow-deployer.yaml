@@ -1,0 +1,373 @@
+---
+# NiFi Flow Deployer Job
+# Deploys OpenSkyAPI flow and configures Kafka connection to GKE cluster
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nifi-flow-deployer-scripts
+  namespace: nifi
+data:
+  deploy_flow.py: |
+    #!/usr/bin/env python3
+    """
+    NiFi Flow Deployer for GKE
+    Deploys OpenSkyAPI flow and configures Kafka bootstrap servers
+    """
+    import os
+    import sys
+    import time
+    import json
+    import requests
+    import uuid
+    from pathlib import Path
+    import warnings
+    from requests.packages.urllib3.exceptions import InsecureRequestWarning
+    requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+
+    # Configuration from environment
+    NIFI_API_BASE_URL = os.environ.get('NIFI_API_URL', 'https://nifi.nifi.svc.cluster.local:8443')
+    NIFI_USER = os.environ.get('NIFI_USERNAME', 'admin')
+    NIFI_PASS = os.environ.get('NIFI_PASSWORD', '')
+    KAFKA_BOOTSTRAP_SERVERS = os.environ.get('KAFKA_BOOTSTRAP_SERVERS', 'kafka-headless.kafka.svc.cluster.local:9092')
+    OPENSKY_CLIENT_SECRET = os.environ.get('OPENSKY_CLIENT_SECRET', '')
+    INSECURE = True  # Skip TLS verification for internal cluster communication
+
+    def wait_for_nifi(url, timeout=300, interval=10):
+        """Wait for NiFi to be available"""
+        print(f"Waiting for NiFi at {url}...")
+        start = time.time()
+        while time.time() - start < timeout:
+            try:
+                r = requests.get(f"{url}/nifi", timeout=10, verify=False)
+                if r.status_code < 500:
+                    print(f"NiFi responded with status {r.status_code}")
+                    return True
+            except Exception as e:
+                print(f"NiFi not ready: {e}")
+            time.sleep(interval)
+        raise RuntimeError(f"Timeout waiting for NiFi at {url}")
+
+    def get_nifi_token(nifi_url, username, password):
+        """Get JWT token from NiFi"""
+        token_url = f"{nifi_url}/nifi-api/access/token"
+        response = requests.post(
+            token_url,
+            data={'username': username, 'password': password},
+            verify=False
+        )
+        response.raise_for_status()
+        return response.text
+
+    def get_root_pg_id(nifi_url, token):
+        """Get root process group ID"""
+        url = f"{nifi_url}/nifi-api/flow/process-groups/root"
+        headers = {'Authorization': f'Bearer {token}'}
+        response = requests.get(url, headers=headers, verify=False)
+        response.raise_for_status()
+        return response.json()['processGroupFlow']['id']
+
+    def list_process_groups(nifi_url, token, parent_pg_id):
+        """List process groups under a parent"""
+        url = f"{nifi_url}/nifi-api/flow/process-groups/{parent_pg_id}"
+        headers = {'Authorization': f'Bearer {token}'}
+        response = requests.get(url, headers=headers, verify=False)
+        response.raise_for_status()
+        flow = response.json().get('processGroupFlow', {}).get('flow', {})
+        return flow.get('processGroups', [])
+
+    def upload_flow(nifi_url, parent_pg_id, flow_name, flow_file, token):
+        """Upload flow JSON file to NiFi"""
+        url = f"{nifi_url}/nifi-api/process-groups/{parent_pg_id}/process-groups/upload"
+        headers = {'Authorization': f'Bearer {token}'}
+        data = {
+            'positionX': '0.0',
+            'positionY': '0.0',
+            'clientId': str(uuid.uuid4()),
+            'disconnectNode': 'true',
+            'groupName': flow_name
+        }
+        with open(flow_file, 'rb') as f:
+            files = {'file': (os.path.basename(flow_file), f, 'application/json')}
+            response = requests.post(url, headers=headers, data=data, files=files, verify=False)
+        response.raise_for_status()
+        print(f"✅ Flow '{flow_name}' uploaded successfully")
+        return response.json()
+
+    def get_controller_services(nifi_url, token, pg_id):
+        """Get controller services in a process group"""
+        url = f"{nifi_url}/nifi-api/flow/process-groups/{pg_id}/controller-services"
+        headers = {'Authorization': f'Bearer {token}'}
+        response = requests.get(url, headers=headers, verify=False)
+        response.raise_for_status()
+        return response.json().get('controllerServices', [])
+
+    def get_controller_service(nifi_url, token, service_id):
+        """Get controller service details"""
+        url = f"{nifi_url}/nifi-api/controller-services/{service_id}"
+        headers = {'Authorization': f'Bearer {token}'}
+        response = requests.get(url, headers=headers, verify=False)
+        response.raise_for_status()
+        return response.json()
+
+    def update_controller_service(nifi_url, token, service_id, properties):
+        """Update controller service properties"""
+        current = get_controller_service(nifi_url, token, service_id)
+        url = f"{nifi_url}/nifi-api/controller-services/{service_id}"
+        headers = {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
+        
+        current_props = current.get('component', {}).get('properties', {}) or {}
+        current_props.update(properties)
+        
+        payload = {
+            'revision': current.get('revision'),
+            'component': {
+                'id': service_id,
+                'properties': current_props
+            }
+        }
+        response = requests.put(url, headers=headers, json=payload, verify=False)
+        response.raise_for_status()
+        print(f"✅ Updated controller service {service_id}")
+        return response.json()
+
+    def set_controller_service_state(nifi_url, token, service_id, state):
+        """Enable or disable controller service"""
+        current = get_controller_service(nifi_url, token, service_id)
+        url = f"{nifi_url}/nifi-api/controller-services/{service_id}/run-status"
+        headers = {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
+        payload = {
+            'revision': current.get('revision'),
+            'state': state,
+            'disconnectedNodeAcknowledged': True
+        }
+        response = requests.put(url, headers=headers, json=payload, verify=False)
+        response.raise_for_status()
+        print(f"✅ Controller service {service_id} set to {state}")
+
+    def schedule_process_group(nifi_url, token, pg_id, running=True):
+        """Start or stop a process group"""
+        url = f"{nifi_url}/nifi-api/flow/process-groups/{pg_id}"
+        headers = {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
+        payload = {
+            'id': pg_id,
+            'state': 'RUNNING' if running else 'STOPPED',
+            'disconnectedNodeAcknowledged': True
+        }
+        response = requests.put(url, headers=headers, json=payload, verify=False)
+        response.raise_for_status()
+        print(f"✅ Process group {pg_id} {'started' if running else 'stopped'}")
+
+    def stop_process_group(nifi_url, token, pg_id):
+        """Stop a process group and all its processors"""
+        schedule_process_group(nifi_url, token, pg_id, running=False)
+
+    def delete_process_group(nifi_url, token, pg_id):
+        """Delete a process group"""
+        url = f"{nifi_url}/nifi-api/process-groups/{pg_id}"
+        headers = {'Authorization': f'Bearer {token}'}
+        
+        # Get current revision
+        current = requests.get(url, headers=headers, verify=False)
+        current.raise_for_status()
+        revision = current.json().get('revision', {})
+        
+        # Delete with revision
+        params = {
+            'version': revision.get('version', 0),
+            'clientId': str(uuid.uuid4()),
+            'disconnectedNodeAcknowledged': 'true'
+        }
+        response = requests.delete(url, headers=headers, params=params, verify=False)
+        response.raise_for_status()
+        print(f"✅ Deleted process group {pg_id}")
+
+    def main():
+        try:
+            print("=" * 60)
+            print("NiFi Flow Deployer for GKE")
+            print("=" * 60)
+            print(f"NiFi URL: {NIFI_API_BASE_URL}")
+            print(f"Kafka Bootstrap: {KAFKA_BOOTSTRAP_SERVERS}")
+            print()
+
+            # Wait for NiFi
+            wait_for_nifi(NIFI_API_BASE_URL)
+            
+            # Get token
+            print("Authenticating with NiFi...")
+            token = get_nifi_token(NIFI_API_BASE_URL, NIFI_USER, NIFI_PASS)
+            print(f"✅ Got token: {token[:20]}...")
+
+            # Get root process group
+            root_pg_id = get_root_pg_id(NIFI_API_BASE_URL, token)
+            print(f"Root PG ID: {root_pg_id}")
+
+            # Check for existing process groups and remove them
+            existing_pgs = list_process_groups(NIFI_API_BASE_URL, token, root_pg_id)
+            for pg in existing_pgs:
+                pg_name = pg.get('component', {}).get('name', '')
+                pg_id = pg.get('id')
+                if pg_name in ['OpenSkyAPI', 'AviationWeatherAPI']:
+                    print(f"Removing existing process group: {pg_name} ({pg_id})")
+                    try:
+                        stop_process_group(NIFI_API_BASE_URL, token, pg_id)
+                        time.sleep(5)
+                        # Need to disable controller services first
+                        services = get_controller_services(NIFI_API_BASE_URL, token, pg_id)
+                        for svc in services:
+                            try:
+                                set_controller_service_state(NIFI_API_BASE_URL, token, svc.get('id'), 'DISABLED')
+                                time.sleep(2)
+                            except Exception as e:
+                                print(f"Warning: Could not disable service {svc.get('id')}: {e}")
+                        delete_process_group(NIFI_API_BASE_URL, token, pg_id)
+                    except Exception as e:
+                        print(f"Warning: Could not remove {pg_name}: {e}")
+
+            # Upload OpenSkyAPI flow
+            flow_file = "/flows/OpenSkyAPI.json"
+            if not os.path.exists(flow_file):
+                raise FileNotFoundError(f"Flow file not found: {flow_file}")
+            
+            print(f"\nUploading flow: {flow_file}")
+            token = get_nifi_token(NIFI_API_BASE_URL, NIFI_USER, NIFI_PASS)  # Refresh token
+            result = upload_flow(NIFI_API_BASE_URL, root_pg_id, "OpenSkyAPI", flow_file, token)
+            new_pg_id = result.get('id')
+            print(f"New process group ID: {new_pg_id}")
+
+            # Get and configure controller services
+            print("\nConfiguring controller services...")
+            time.sleep(3)
+            services = get_controller_services(NIFI_API_BASE_URL, token, new_pg_id)
+            
+            for svc in services:
+                svc_id = svc.get('id')
+                svc_name = svc.get('component', {}).get('name', '')
+                svc_type = svc.get('component', {}).get('type', '')
+                svc_state = svc.get('status', {}).get('runStatus', '')
+                print(f"  - {svc_name} ({svc_type}): {svc_state}")
+                
+                # Update Kafka bootstrap servers
+                if 'Kafka' in svc_type or 'Kafka' in svc_name:
+                    print(f"    Updating Kafka bootstrap servers to: {KAFKA_BOOTSTRAP_SERVERS}")
+                    try:
+                        if svc_state == 'ENABLED':
+                            set_controller_service_state(NIFI_API_BASE_URL, token, svc_id, 'DISABLED')
+                            time.sleep(2)
+                        update_controller_service(NIFI_API_BASE_URL, token, svc_id, {
+                            'bootstrap.servers': KAFKA_BOOTSTRAP_SERVERS
+                        })
+                    except Exception as e:
+                        print(f"    Warning: Could not update Kafka service: {e}")
+                
+                # Update OAuth2 client secret (note: property is 'Client secret' with lowercase 's')
+                if 'OAuth2' in svc_type or 'OAuth' in svc_name:
+                    if OPENSKY_CLIENT_SECRET:
+                        print(f"    Updating OAuth2 client secret")
+                        try:
+                            if svc_state == 'ENABLED':
+                                set_controller_service_state(NIFI_API_BASE_URL, token, svc_id, 'DISABLED')
+                                time.sleep(2)
+                            update_controller_service(NIFI_API_BASE_URL, token, svc_id, {
+                                'Client secret': OPENSKY_CLIENT_SECRET
+                            })
+                        except Exception as e:
+                            print(f"    Warning: Could not update OAuth2 service: {e}")
+
+            # Enable all controller services
+            print("\nEnabling controller services...")
+            time.sleep(2)
+            services = get_controller_services(NIFI_API_BASE_URL, token, new_pg_id)
+            for svc in services:
+                svc_id = svc.get('id')
+                svc_state = svc.get('status', {}).get('runStatus', '')
+                if svc_state != 'ENABLED':
+                    try:
+                        set_controller_service_state(NIFI_API_BASE_URL, token, svc_id, 'ENABLED')
+                        time.sleep(2)
+                    except Exception as e:
+                        print(f"Warning: Could not enable service {svc_id}: {e}")
+
+            # Start the process group
+            print("\nStarting process group...")
+            time.sleep(3)
+            schedule_process_group(NIFI_API_BASE_URL, token, new_pg_id, running=True)
+
+            print("\n" + "=" * 60)
+            print("✅ Flow deployment completed successfully!")
+            print("=" * 60)
+
+        except Exception as e:
+            print(f"\n❌ ERROR: {e}")
+            import traceback
+            traceback.print_exc()
+            sys.exit(1)
+
+    if __name__ == "__main__":
+        main()
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: nifi-flow-deployer
+  namespace: nifi
+spec:
+  ttlSecondsAfterFinished: 600
+  backoffLimit: 3
+  template:
+    spec:
+      tolerations:
+        - key: "workload"
+          operator: "Equal"
+          value: "kafka"
+          effect: "NoSchedule"
+      restartPolicy: OnFailure
+      containers:
+        - name: flow-deployer
+          image: python:3.11-slim
+          command:
+            - /bin/bash
+            - -c
+            - |
+              pip install requests -q
+              python /scripts/deploy_flow.py
+          env:
+            - name: NIFI_API_URL
+              value: "https://nifi.nifi.svc.cluster.local:8443"
+            - name: NIFI_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: nifi-credentials
+                  key: NIFI_SINGLE_USER_USERNAME
+            - name: NIFI_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: nifi-credentials
+                  key: NIFI_SINGLE_USER_PASSWORD
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: "kafka-headless.kafka.svc.cluster.local:9092"
+            - name: OPENSKY_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: nifi-credentials
+                  key: OPENSKY_CLIENT_SECRET
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+            - name: flows
+              mountPath: /flows
+      volumes:
+        - name: scripts
+          configMap:
+            name: nifi-flow-deployer-scripts
+        - name: flows
+          configMap:
+            name: nifi-flows
+---
+# ConfigMap containing the flow JSON files
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nifi-flows
+  namespace: nifi
+data: {}

@@ -227,7 +227,7 @@ create_node_pools() {
     print_progress "Creating specialized node pools"
     
     # Kafka pool
-    log_info "Creating Kafka node pool (3x e2-standard-2, dedicated)..."
+    log_info "Creating Kafka node pool (3x e2-standard-2, dedicated, 1 per zone)..."
     if gcloud container node-pools describe kafka-pool --cluster $CLUSTER_NAME --region $GCP_REGION &>/dev/null; then
         log_warn "Kafka pool already exists, skipping"
     else
@@ -235,7 +235,7 @@ create_node_pools() {
             --cluster $CLUSTER_NAME \
             --region $GCP_REGION \
             --machine-type e2-standard-2 \
-            --num-nodes 3 \
+            --num-nodes 1 \
             --node-locations ${GCP_ZONE},${GCP_REGION}-b,${GCP_REGION}-c \
             --enable-autorepair \
             --enable-autoupgrade \
@@ -249,7 +249,7 @@ create_node_pools() {
     fi
     
     # Data pool (Cassandra + Spark)
-    log_info "Creating Data node pool (3x e2-standard-4, Spot VMs)..."
+    log_info "Creating Data node pool (3x e2-standard-4, Spot VMs, 1 per zone)..."
     if gcloud container node-pools describe data-pool --cluster $CLUSTER_NAME --region $GCP_REGION &>/dev/null; then
         log_warn "Data pool already exists, skipping"
     else
@@ -257,7 +257,7 @@ create_node_pools() {
             --cluster $CLUSTER_NAME \
             --region $GCP_REGION \
             --machine-type e2-standard-4 \
-            --num-nodes 3 \
+            --num-nodes 1 \
             --node-locations ${GCP_ZONE},${GCP_REGION}-b,${GCP_REGION}-c \
             --enable-autorepair \
             --enable-autoupgrade \

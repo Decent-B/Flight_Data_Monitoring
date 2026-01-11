@@ -1,0 +1,40 @@
+FROM apache/spark-py:v3.4.0
+
+USER root
+
+# Install Python dependencies
+RUN pip install --no-cache-dir \
+    confluent-kafka \
+    requests \
+    python-dateutil \
+    airportsdata \
+    pycountry \
+    pyarrow \
+    pandas \
+    reverse_geocode
+
+# Copy application code
+COPY spark/ /app/spark/
+
+# Create spark user properly in /etc/passwd for Hadoop compatibility
+RUN if ! id -u spark > /dev/null 2>&1; then \
+      useradd -u 185 -g 0 -d /home/spark -m -s /bin/bash spark; \
+    fi && \
+    mkdir -p /tmp/checkpoints /tmp/spark-events /tmp/.ivy2 /home/spark && \
+    chmod -R 777 /tmp/checkpoints /tmp/spark-events /tmp/.ivy2 /home/spark && \
+    chown -R 185:0 /app /tmp/.ivy2 /home/spark && \
+    chmod -R 775 /app
+
+# Set environment variables
+ENV HOME=/home/spark
+ENV USER=spark
+ENV HADOOP_USER_NAME=spark
+
+# Set working directory
+WORKDIR /opt/spark/work-dir
+
+# Switch back to spark user
+USER 185
+
+# Default command
+CMD ["/opt/spark/bin/spark-submit", "/app/spark/reader.py"]

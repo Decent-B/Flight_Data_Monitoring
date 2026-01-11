@@ -2,35 +2,45 @@ server:
   workers: 1
   config:
     query:
-      maxMemory: "1GB"
+      maxMemory: "512MB"
 additionalConfigProperties:
-  - query.max-memory-per-node=512MB
+  - query.max-memory-per-node=256MB
 coordinator:
   jvm:
     maxHeapSize: "768M"
   resources:
     limits:
       cpu: "1"
-      memory: "1Gi"
+      memory: "1536Mi"
     requests:
-      cpu: "250m"
-      memory: "512Mi"
+      cpu: "200m"
+      memory: "1Gi"
+  tolerations:
+    - key: "workload"
+      operator: "Equal"
+      value: "kafka"
+      effect: "NoSchedule"
 worker:
   jvm:
     maxHeapSize: "768M"
   resources:
     limits:
       cpu: "1"
-      memory: "1Gi"
+      memory: "1536Mi"
     requests:
-      cpu: "250m"
-      memory: "512Mi"
+      cpu: "200m"
+      memory: "1Gi"
+  tolerations:
+    - key: "workload"
+      operator: "Equal"
+      value: "kafka"
+      effect: "NoSchedule"
 catalogs:
-  cassandra.properties: |
+  cassandra: |
     connector.name=cassandra
-    cassandra.contact-points=cassandra.default.svc.cluster.local
+    cassandra.contact-points=cassandra.cassandra.svc.cluster.local
     cassandra.native-protocol-port=9042
-    cassandra.load-policy.dc-aware.local-dc=dc1
+    cassandra.load-policy.dc-aware.local-dc=gke-dc1
     cassandra.consistency-level=ONE
 
 service:

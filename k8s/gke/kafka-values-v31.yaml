@@ -1,0 +1,86 @@
+# Kafka Helm Values for GKE (Compatible with Bitnami Chart v31.x / Kafka 3.9)
+
+# Use a specific image that exists
+image:
+  registry: docker.io
+  repository: bitnami/kafka
+  tag: 3.7.0-debian-12-r0
+  pullPolicy: IfNotPresent
+
+# Controller settings (combined broker+controller in KRaft mode)
+controller:
+  replicaCount: 3
+  
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  
+  persistence:
+    enabled: true
+    storageClass: "pd-ssd"
+    size: 10Gi
+  
+  # Node affinity for kafka-pool
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: workload
+            operator: In
+            values:
+            - kafka
+  
+  # Tolerations for kafka-pool taint
+  tolerations:
+    - key: "workload"
+      operator: "Equal"
+      value: "kafka"
+      effect: "NoSchedule"
+
+# Broker settings (disabled - using combined mode)
+broker:
+  replicaCount: 0
+
+# Use KRaft mode (no ZooKeeper)
+kraft:
+  enabled: true
+
+# Kafka configuration
+extraConfig: |
+  log.retention.hours=24
+  log.retention.bytes=1073741824
+  log.segment.bytes=536870912
+  num.network.threads=3
+  num.io.threads=8
+  default.replication.factor=2
+  min.insync.replicas=1
+  log.cleanup.policy=delete
+  log.cleaner.enable=true
+
+# JVM settings
+heapOpts: "-Xms512m -Xmx1g"
+
+# Listeners
+listeners:
+  client:
+    protocol: PLAINTEXT
+  controller:
+    protocol: PLAINTEXT
+  interbroker:
+    protocol: PLAINTEXT
+
+# Service configuration
+service:
+  type: ClusterIP
+
+# Disable metrics for simplicity
+metrics:
+  kafka:
+    enabled: false
+  jmx:
+    enabled: false

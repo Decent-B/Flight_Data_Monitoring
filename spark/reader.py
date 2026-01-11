@@ -534,7 +534,6 @@ if __name__ == "__main__":
     aircrafts_by_icao24 = get_aircrafts_by_icao(flights_df)
     query1 = aircrafts_by_icao24.writeStream \
         .format("org.apache.spark.sql.cassandra") \
-        .option("checkpointLocation", checkpoint_path + "aircrafts_by_icao/") \
         .options(table="aircrafts_by_icao24", keyspace="flight_analytics") \
         .outputMode("append") \
         .start()
@@ -542,14 +541,12 @@ if __name__ == "__main__":
     # MinIO Archival: Raw flight states (10-minute micro-batches)
     query_archive_flights = flights_df.writeStream \
         .foreachBatch(lambda batch_df, batch_id: archive_to_minio(batch_df, batch_id, bucket_flight_raw, "timestamp")) \
-        .option("checkpointLocation", checkpoint_path + "archive_flights/") \
         .trigger(processingTime="5 minutes") \
         .start()
     
     aircraftstates_by_icao24 = get_aircraftstates_by_icao24(track_df)
     query2 = aircraftstates_by_icao24.writeStream \
         .format("org.apache.spark.sql.cassandra") \
-        .option("checkpointLocation", checkpoint_path + "aircraftstates_by_icao/") \
         .options(table="aircraftstates_by_icao24", keyspace="flight_analytics") \
         .outputMode("append") \
         .start()
@@ -557,14 +554,12 @@ if __name__ == "__main__":
     # MinIO Archival: Flight tracks (10-minute micro-batches)
     query_archive_tracks = track_df.writeStream \
         .foreachBatch(archive_tracks_to_minio) \
-        .option("checkpointLocation", checkpoint_path + "archive_tracks/") \
         .trigger(processingTime="5 minutes") \
         .start()
     
     aircrafts_by_cell_minute = get_aircrafts_by_cell_minute(flights_df)
     query3 = aircrafts_by_cell_minute.writeStream \
         .format("org.apache.spark.sql.cassandra") \
-        .option("checkpointLocation", checkpoint_path + "aircrafts_by_cell_minute/") \
         .options(table="aircrafts_by_cell_minute", keyspace="flight_analytics") \
         .outputMode("append") \
         .start()
@@ -572,7 +567,6 @@ if __name__ == "__main__":
     activeaircraft_by_country_hour = get_activeaircraft_by_country_hour(flights_df)
     query4 = activeaircraft_by_country_hour.writeStream \
         .format("org.apache.spark.sql.cassandra") \
-        .option("checkpointLocation", checkpoint_path + "activeaircraft_by_country_hour/") \
         .options(table="activeaircraft_by_country_hour", keyspace="flight_analytics") \
         .outputMode("append") \
         .start()
@@ -580,7 +574,6 @@ if __name__ == "__main__":
     departures_by_country_hour = get_departures_by_country_hour(flightinfo_df)
     query5 = departures_by_country_hour.writeStream \
         .format("org.apache.spark.sql.cassandra") \
-        .option("checkpointLocation", checkpoint_path + "departures_by_country_hour/") \
         .options(table="departures_by_country_hour", keyspace="flight_analytics") \
         .outputMode("append") \
         .start()
@@ -588,7 +581,6 @@ if __name__ == "__main__":
     # MinIO Archival: Flight connection data (10-minute micro-batches)
     query_archive_flight_data = flightinfo_df.writeStream \
         .foreachBatch(archive_flight_data_to_minio) \
-        .option("checkpointLocation", checkpoint_path + "archive_flight_data/") \
         .trigger(processingTime="10 minutes") \
         .start()
     
