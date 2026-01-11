@@ -9,11 +9,11 @@ RUN pip install --no-cache-dir confluent-kafka requests python-dateutil airports
 # Copy application code
 COPY kafka/ /app/kafka/
 COPY spark/ /app/spark/
-# COPY src/kafka_reader.py /app/kafka_reader.py
-# COPY src/utils.py /app/utils.py
+COPY config/ /app/config/
  
 # Update Kafka bootstrap servers for Docker network - use internal container names
-RUN sed -i 's/localhost:29092,localhost:29093,localhost:29094/kafka-broker-1:9092,kafka-broker-2:9092,kafka-broker-3:9092/g' /app/spark/reader.py
+# Apply to all Python files in spark directory (reader.py and weather_processor.py)
+RUN sed -i 's/localhost:29092,localhost:29093,localhost:29094/kafka-broker-1:9092,kafka-broker-2:9092,kafka-broker-3:9092/g' /app/spark/*.py
  
 # Create directories with proper permissions
 RUN mkdir -p /tmp/checkpoints /tmp/spark-events /opt/spark/.ivy2 /opt/spark/work-dir && \
@@ -29,3 +29,4 @@ USER 185
  
 # Default command (will be overridden by docker-compose)
 CMD ["/opt/spark/bin/spark-submit", "/app/spark/reader.py"]
+CMD ["/opt/spark/bin/spark-submit", "/app/spark/weather_processor.py"]
