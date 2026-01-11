@@ -82,6 +82,7 @@ services:
       - REGISTRY_API_URL=http://nifi-registry:18080
       - NIFI_USERNAME=${NIFI_SINGLE_USER_USERNAME}
       - NIFI_PASSWORD=${NIFI_SINGLE_USER_PASSWORD}
+      - OPENSKY_CLIENT_SECRET=${OPENSKY_CLIENT_SECRET}
       # Set to "true" if you want to ignore self-signed cert issues (dev only)
       - INSECURE_SKIP_TLS_VERIFY=true
     entrypoint:
