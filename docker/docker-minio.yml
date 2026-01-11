@@ -36,6 +36,10 @@ services:
       mc mb myminio/flight-data --ignore-existing;
       mc mb myminio/flight-tracks --ignore-existing;
       mc mb myminio/checkpoints --ignore-existing;
+      mc mb myminio/weather-metar --ignore-existing;
+      mc mb myminio/weather-taf --ignore-existing;
+      mc mb myminio/weather-isigmet --ignore-existing;
+
       echo 'Buckets created successfully';
       "
     networks:

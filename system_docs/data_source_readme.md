@@ -154,7 +154,7 @@ This document describes the JSON schema and properties for data published to eac
 
 ## Aviation Weather API Kafka Topics
 
-### Topic: `metar`
+### Topic: `current_airport_weather`
 
 **Source**: [Aviation Weather API - METAR](https://aviationweather.gov/data/api/)
 
@@ -226,7 +226,7 @@ This document describes the JSON schema and properties for data published to eac
 
 ---
 
-### Topic: `taf`
+### Topic: `future_airport_weather`
 
 **Source**: [Aviation Weather API - TAF](https://aviationweather.gov/data/api/)
 
@@ -298,7 +298,7 @@ This document describes the JSON schema and properties for data published to eac
 
 ---
 
-### Topic: `isigmet`
+### Topic: `weather_warnings`
 
 **Source**: [Aviation Weather API - International SIGMET](https://aviationweather.gov/data/api/)
 

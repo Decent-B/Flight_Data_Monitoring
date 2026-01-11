@@ -151,7 +151,7 @@ def get_isigmet_schema() -> StructType:
 def read_metar_stream(
     spark: SparkSession,
     bootstrap_servers: str = "kafka-broker-1:9092,kafka-broker-2:9092,kafka-broker-3:9092",
-    topic: str = "metar"
+    topic: str = "current_airport_weather"
 ) -> DataFrame:
     """
     Reads METAR data from Kafka stream and returns parsed DataFrame.
@@ -171,6 +171,7 @@ def read_metar_stream(
         .format("kafka") \
         .option("kafka.bootstrap.servers", bootstrap_servers) \
         .option("subscribe", topic) \
+        .option("failOnDataLoss", "false") \
         .load()
     
     # Parse JSON and flatten structure
@@ -200,7 +201,7 @@ def read_metar_stream(
     
     # Convert ISO 8601 timestamp to Unix timestamp
     parsed_stream = parsed_stream \
-        .withColumn("obs_time", unix_timestamp(col("obs_time_iso"))) \
+        .withColumn("obs_time", unix_timestamp(to_timestamp(col("obs_time_iso")))) \
         .withColumn("timestamp", to_timestamp(col("obs_time_iso"))) \
         .withColumn("lat", col("coordinates").getItem(1)) \
         .withColumn("lon", col("coordinates").getItem(0)) \
@@ -212,7 +213,7 @@ def read_metar_stream(
 def read_taf_stream(
     spark: SparkSession,
     bootstrap_servers: str = "kafka-broker-1:9092,kafka-broker-2:9092,kafka-broker-3:9092",
-    topic: str = "taf"
+    topic: str = "future_airport_weather"
 ) -> DataFrame:
     """
     Reads TAF data from Kafka stream and returns parsed DataFrame.
@@ -232,6 +233,7 @@ def read_taf_stream(
         .format("kafka") \
         .option("kafka.bootstrap.servers", bootstrap_servers) \
         .option("subscribe", topic) \
+        .option("failOnDataLoss", "false") \
         .load()
     
     # Parse JSON and flatten structure
@@ -260,9 +262,9 @@ def read_taf_stream(
     
     # Convert ISO 8601 timestamps to Unix timestamps
     parsed_stream = parsed_stream \
-        .withColumn("issue_time", unix_timestamp(col("issue_time_iso"))) \
-        .withColumn("valid_from", unix_timestamp(col("valid_from_iso"))) \
-        .withColumn("valid_to", unix_timestamp(col("valid_to_iso"))) \
+        .withColumn("issue_time", unix_timestamp(to_timestamp(col("issue_time_iso")))) \
+        .withColumn("valid_from", unix_timestamp(to_timestamp(col("valid_from_iso")))) \
+        .withColumn("valid_to", unix_timestamp(to_timestamp(col("valid_to_iso")))) \
         .withColumn("timestamp", to_timestamp(col("issue_time_iso"))) \
         .withColumn("lat", col("coordinates").getItem(1)) \
         .withColumn("lon", col("coordinates").getItem(0)) \
@@ -274,7 +276,7 @@ def read_taf_stream(
 def read_isigmet_stream(
     spark: SparkSession,
     bootstrap_servers: str = "kafka-broker-1:9092,kafka-broker-2:9092,kafka-broker-3:9092",
-    topic: str = "isigmet"
+    topic: str = "weather_warnings"
 ) -> DataFrame:
     """
     Reads International SIGMET data from Kafka stream and returns parsed DataFrame.
@@ -294,6 +296,7 @@ def read_isigmet_stream(
         .format("kafka") \
         .option("kafka.bootstrap.servers", bootstrap_servers) \
         .option("subscribe", topic) \
+        .option("failOnDataLoss", "false") \
         .load()
     
     # Parse JSON and flatten structure
@@ -320,8 +323,8 @@ def read_isigmet_stream(
     
     # Convert ISO 8601 timestamps to Unix timestamps
     parsed_stream = parsed_stream \
-        .withColumn("valid_from", unix_timestamp(col("valid_from_iso"))) \
-        .withColumn("valid_to", unix_timestamp(col("valid_to_iso"))) \
+        .withColumn("valid_from", unix_timestamp(to_timestamp(col("valid_from_iso")))) \
+        .withColumn("valid_to", unix_timestamp(to_timestamp(col("valid_to_iso")))) \
         .withColumn("timestamp", to_timestamp(col("valid_from_iso"))) \
         .drop("valid_from_iso", "valid_to_iso")
     
@@ -339,7 +342,7 @@ def get_metar_latest_by_station(metar_df: DataFrame) -> DataFrame:
     
     Spark Responsibilities:
     - Deduplicate: Keep only latest obs_time per station
-    - Filter: Remove observations with null lat/lon
+    - Filter: Remove observations with null lat/lon and null primary keys
     - Stringify: Convert clouds array to JSON text
     
     Args:
@@ -348,9 +351,12 @@ def get_metar_latest_by_station(metar_df: DataFrame) -> DataFrame:
     Returns:
         DataFrame with latest METAR per station
     """
-    # Filter out observations with null coordinates
+    # Filter out observations with null coordinates or null primary keys
+    # PRIMARY KEY: (station_id)
     filtered_df = metar_df.filter(
-        col("lat").isNotNull() & col("lon").isNotNull()
+        col("lat").isNotNull() & 
+        col("lon").isNotNull() &
+        col("station_id").isNotNull()
     )
     
     # Add watermark for late data handling (10 minutes)
@@ -400,7 +406,7 @@ def get_metar_history_by_station(metar_df: DataFrame) -> DataFrame:
     
     Spark Responsibilities:
     - Watermark: Handle 10-minute late arrivals
-    - Filter: Remove duplicates (same station_id + obs_time)
+    - Filter: Remove rows with null primary keys (station_id, obs_time)
     - Minimal fields: Only store timeline-critical fields
     
     Args:
@@ -409,8 +415,15 @@ def get_metar_history_by_station(metar_df: DataFrame) -> DataFrame:
     Returns:
         DataFrame with METAR history (time-series)
     """
+    # Filter out rows with null primary keys
+    # PRIMARY KEY: (station_id, obs_time)
+    filtered_df = metar_df.filter(
+        col("station_id").isNotNull() & 
+        col("obs_time").isNotNull()
+    )
+    
     # Add watermark for late data handling
-    watermarked_df = metar_df.withWatermark("timestamp", "10 minutes")
+    watermarked_df = filtered_df.withWatermark("timestamp", "10 minutes")
     
     # Select only timeline-critical fields (minimal for performance)
     result_df = watermarked_df.select(
@@ -439,7 +452,7 @@ def get_sigmet_by_validtime(isigmet_df: DataFrame) -> DataFrame:
     Spark Responsibilities:
     - Compute hour_bucket: valid_from / 3600 * 3600 (floor to hour)
     - Stringify polygon: GeoJSON coordinates → JSON text
-    - Filter: Remove SIGMETs with missing polygon data
+    - Filter: Remove SIGMETs with missing polygon data or null primary keys
     
     Args:
         isigmet_df: Parsed ISIGMET DataFrame from read_isigmet_stream
@@ -447,8 +460,13 @@ def get_sigmet_by_validtime(isigmet_df: DataFrame) -> DataFrame:
     Returns:
         DataFrame with SIGMETs partitioned by hour bucket
     """
-    # Filter out SIGMETs with null polygon data
-    filtered_df = isigmet_df.filter(col("polygon_coords").isNotNull())
+    # Filter out SIGMETs with null polygon data or null primary keys
+    # PRIMARY KEY: ((hour_bucket), icao_id, series_id, valid_from)
+    # Note: hour_bucket computed from valid_from, so check valid_from before computation
+    filtered_df = isigmet_df.filter(
+        col("valid_from").isNotNull() &
+        col("icao_id").isNotNull()
+    )
     
     # Add watermark for late data handling
     watermarked_df = filtered_df.withWatermark("timestamp", "10 minutes")
@@ -498,7 +516,7 @@ def get_taf_by_station(taf_df: DataFrame) -> DataFrame:
     Spark Responsibilities:
     - Parse TAF bulletins: Already split into periods by NiFi (timeGroup field)
     - Stringify clouds: array → JSON text
-    - Deduplicate: Remove duplicate periods
+    - Filter: Remove rows with null primary keys
     
     Args:
         taf_df: Parsed TAF DataFrame from read_taf_stream
@@ -506,8 +524,15 @@ def get_taf_by_station(taf_df: DataFrame) -> DataFrame:
     Returns:
         DataFrame with TAF forecast periods
     """
+    # Filter out rows with null primary keys
+    # PRIMARY KEY: ((station_id, issue_time), time_group, valid_from)
+    filtered_df = taf_df.filter(
+        col("station_id").isNotNull() & 
+        col("issue_time").isNotNull()
+    )
+    
     # Add watermark for late data handling
-    watermarked_df = taf_df.withWatermark("timestamp", "10 minutes")
+    watermarked_df = filtered_df.withWatermark("timestamp", "10 minutes")
     
     # Convert clouds array to JSON string
     with_clouds_json = watermarked_df.withColumn(
@@ -595,7 +620,12 @@ if __name__ == "__main__":
     taf_df = read_taf_stream(spark)
     isigmet_df = read_isigmet_stream(spark)
     print("✓ Weather streams initialized")
-    
+    taf_df.writeStream \
+        .format("console") \
+        .outputMode("append") \
+        .option("truncate", "false") \
+        .option("numRows", 5) \
+        .start()
     # Apply transformations
     print("\n[2/3] Applying transformations...")
     

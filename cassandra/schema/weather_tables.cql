@@ -22,6 +22,7 @@ USE flight_analytics;
 -- Q1: Get latest METAR for all stations in viewport
 --     SELECT * FROM metar_latest_by_station WHERE station_id IN (list of visible stations)
 --
+DROP TABLE IF EXISTS metar_latest_by_station;
 CREATE TABLE IF NOT EXISTS metar_latest_by_station (
     -- Partition Key (one row per station)
     station_id text,              -- ICAO station code (e.g., "KJFK")
@@ -87,6 +88,7 @@ CREATE TABLE IF NOT EXISTS metar_latest_by_station (
 --     SELECT * FROM metar_history_by_station 
 --     WHERE station_id = 'KJFK' AND obs_time >= ? AND obs_time <= ?
 --
+DROP TABLE IF EXISTS metar_history_by_station;
 CREATE TABLE IF NOT EXISTS metar_history_by_station (
     -- Partition Key
     station_id text,              -- ICAO station code (e.g., "KJFK")
@@ -133,6 +135,7 @@ AND comment = 'METAR time-series history for timeline comparison (append-only, T
 -- Q2: Altitude filtering (application-side after query)
 --     Filter by: base <= target_altitude AND top >= target_altitude
 --
+DROP TABLE IF EXISTS sigmet_by_validtime;
 CREATE TABLE IF NOT EXISTS sigmet_by_validtime (
     -- Partition Key: hour bucket for time-based partitioning
     hour_bucket bigint,           -- valid_from floored to hour (computed by Spark)
@@ -170,8 +173,8 @@ CREATE TABLE IF NOT EXISTS sigmet_by_validtime (
     -- Raw SIGMET (for tooltip/details)
     raw_sigmet text,              -- Complete raw SIGMET text
     
-    PRIMARY KEY ((hour_bucket), icao_id, series_id, valid_from)
-) WITH CLUSTERING ORDER BY (icao_id ASC, series_id ASC, valid_from DESC)
+    PRIMARY KEY (icao_id, hour_bucket)
+) WITH CLUSTERING ORDER BY (hour_bucket DESC)
 AND default_time_to_live = 604800  -- 7 days retention (SIGMETs are important safety info)
 AND comment = 'SIGMETs partitioned by hour bucket (Spark-computed), supports time-slider queries';
 
@@ -202,6 +205,7 @@ AND comment = 'SIGMETs partitioned by hour bucket (Spark-computed), supports tim
 --     WHERE station_id = 'KJFK' AND issue_time = ?
 --     AND valid_from >= ? AND valid_to <= ?
 --
+DROP TABLE IF EXISTS taf_by_station;
 CREATE TABLE IF NOT EXISTS taf_by_station (
     -- Partition Key (groups all periods from one TAF bulletin)
     station_id text,              -- ICAO station code (e.g., "KJFK")
@@ -240,8 +244,8 @@ CREATE TABLE IF NOT EXISTS taf_by_station (
     -- Raw TAF (complete bulletin for this period)
     raw_taf text,                 -- Complete raw TAF text
     
-    PRIMARY KEY ((station_id, issue_time), time_group, valid_from)
-) WITH CLUSTERING ORDER BY (time_group ASC, valid_from ASC)
+    PRIMARY KEY (station_id, issue_time)
+) WITH CLUSTERING ORDER BY (issue_time DESC)
 AND default_time_to_live = 259200  -- 3 days retention (TAFs are valid up to 30 hours max)
 AND comment = 'TAF forecast periods grouped by bulletin (Spark assigns time_group ordering)';
 
