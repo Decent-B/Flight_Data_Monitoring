@@ -1,0 +1,148 @@
+# Spark Streaming Deployment for EKS
+# Runs Spark Structured Streaming job consuming from Kafka and writing to Cassandra
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: spark
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: spark-sa
+  namespace: spark
+  annotations:
+    # IRSA annotation - replace with actual role ARN after creation
+    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/spark-s3-role
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spark-stream
+  namespace: spark
+  labels:
+    app: spark-stream
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spark-stream
+  template:
+    metadata:
+      labels:
+        app: spark-stream
+    spec:
+      serviceAccountName: spark-sa
+      
+      # Schedule on data nodes
+      nodeSelector:
+        role: data
+      
+      # Security context
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      
+      containers:
+      - name: spark-stream
+        # Replace with actual ECR image
+        image: ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/flight-data-spark:latest
+        imagePullPolicy: Always
+        
+        command:
+        - /opt/spark/bin/spark-submit
+        args:
+        - --master
+        - local[4]
+        - --driver-memory
+        - 2g
+        - --executor-memory
+        - 2g
+        - --packages
+        - org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.0,com.datastax.spark:spark-cassandra-connector_2.12:3.4.1,org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262
+        - --conf
+        - spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem
+        - --conf
+        - spark.hadoop.fs.s3a.aws.credentials.provider=com.amazonaws.auth.WebIdentityTokenCredentialsProvider
+        - /app/spark/reader.py
+        
+        env:
+        - name: USER
+          value: spark
+        - name: HADOOP_USER_NAME
+          value: spark
+        - name: SPARK_USER
+          value: spark
+        - name: HOME
+          value: /tmp
+        - name: SPARK_SUBMIT_OPTS
+          value: "-Divy.home=/tmp/.ivy2 -Divy.cache.dir=/tmp/.ivy2"
+        # AWS Region for S3
+        - name: AWS_REGION
+          value: "us-east-1"
+        
+        envFrom:
+        - configMapRef:
+            name: spark-stream-config
+        - secretRef:
+            name: spark-stream-secrets
+        
+        # Resources for t3.large nodes
+        resources:
+          requests:
+            cpu: "500m"
+            memory: 2Gi
+          limits:
+            cpu: "2"
+            memory: 4Gi
+        
+        # Volume mounts for Spark temp files
+        volumeMounts:
+        - name: spark-tmp
+          mountPath: /tmp
+        - name: spark-work
+          mountPath: /opt/spark/work-dir
+        
+        # Liveness probe
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pgrep -f "spark-submit" > /dev/null
+          initialDelaySeconds: 120
+          periodSeconds: 30
+          failureThreshold: 3
+      
+      volumes:
+      - name: spark-tmp
+        emptyDir:
+          sizeLimit: 2Gi
+      - name: spark-work
+        emptyDir:
+          sizeLimit: 1Gi
+      
+      # Restart policy
+      restartPolicy: Always
+---
+# Horizontal Pod Autoscaler (optional)
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: spark-stream-hpa
+  namespace: spark
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: spark-stream
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70

@@ -10,7 +10,7 @@
 
   Command:  minikube service -n superset superset --url
   
-  URL:      http://127.0.0.1:<port>
+  URL:      http://<superset-host>:<port>
   
   Login:    Username: admin
             Password: admin

@@ -5,9 +5,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.nifi
-      args:
-        NIFI_USERNAME: ${NIFI_SINGLE_USER_USERNAME}
-        NIFI_PASSWORD: ${NIFI_SINGLE_USER_PASSWORD}
     image: custom-nifi-secure
     container_name: project_nifi
     restart: unless-stopped
@@ -37,7 +34,7 @@ services:
 
     # Robust healthcheck: uses HTTPS, accepts self-signed certs, waits a bit before starting checks
     healthcheck:
-      test: ["CMD-SHELL", "curl -kSf --max-time 10 https://localhost:8443/nifi/ >/dev/null 2>&1 || (echo 'NiFi healthcheck failed' >&2; exit 1)"]
+      test: ["CMD-SHELL", "curl -kSf --max-time 10 https://nifi:8443/nifi/ >/dev/null 2>&1 || (echo 'NiFi healthcheck failed' >&2; exit 1)"]
       interval: 30s
       timeout: 15s
       retries: 5

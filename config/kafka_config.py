@@ -11,9 +11,9 @@ class KafkaConfig:
     
     # Distributed Kafka Brokers (modify based on your setup)
     BOOTSTRAP_SERVERS: List[str] = [
-        os.getenv('KAFKA_BROKER_1', 'localhost:29092'),
-        os.getenv('KAFKA_BROKER_2', 'localhost:29093'),
-        os.getenv('KAFKA_BROKER_3', 'localhost:29094'),
+        os.getenv('KAFKA_BROKER_1', 'kafka-broker-1:9092'),
+        os.getenv('KAFKA_BROKER_2', 'kafka-broker-2:9092'),
+        os.getenv('KAFKA_BROKER_3', 'kafka-broker-3:9092'),
     ]
     
     # Topics

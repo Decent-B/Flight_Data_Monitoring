@@ -1,0 +1,35 @@
+# Spark ConfigMap for EKS
+# Contains non-sensitive configuration for Spark Structured Streaming
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spark-stream-config
+  namespace: spark
+data:
+  # Kafka configuration
+  KAFKA_BOOTSTRAP_SERVERS: "kafka-controller-0.kafka-controller-headless.kafka.svc.cluster.local:9092,kafka-controller-1.kafka-controller-headless.kafka.svc.cluster.local:9092,kafka-controller-2.kafka-controller-headless.kafka.svc.cluster.local:9092"
+  KAFKA_TOPIC_FLIGHTS_RAW: "flights_raw"
+  KAFKA_TOPIC_FLIGHT_DATA: "flight_data"
+  KAFKA_TOPIC_FLIGHT_TRACK: "flight_track"
+  
+  # Cassandra configuration
+  CASSANDRA_HOST: "cassandra.cassandra.svc.cluster.local"
+  CASSANDRA_PORT: "9042"
+  CASSANDRA_KEYSPACE: "flight_analytics"
+  CASSANDRA_DC: "dc1"
+  
+  # S3 configuration (checkpoints)
+  # Note: Replace with actual bucket name after creation
+  S3_BUCKET: "flight-data-checkpoints"
+  S3_CHECKPOINT_PATH: "s3a://flight-data-checkpoints/checkpoints"
+  S3_ARCHIVE_PATH: "s3a://flight-data-checkpoints/archives"
+  
+  # Spark streaming configuration
+  SPARK_STREAMING_TRIGGER_INTERVAL: "10 seconds"
+  SPARK_STREAMING_CHECKPOINT_LOCATION: "s3a://flight-data-checkpoints/checkpoints"
+  
+  # Processing configuration
+  SPARK_SQL_SHUFFLE_PARTITIONS: "12"
+  SPARK_EXECUTOR_MEMORY: "2g"
+  SPARK_DRIVER_MEMORY: "2g"

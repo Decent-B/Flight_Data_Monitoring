@@ -33,6 +33,9 @@ NIFI_PASS = os.environ.get('NIFI_PASSWORD', '')
 INSECURE = os.environ.get('INSECURE_SKIP_TLS_VERIFY', 'true').lower() in ('1', 'true', 'yes')
 FLOW_PATH_HOST = '/flows/OpenSkyAPI.json'  # file mounted read-only from host -> container
 PG_NAMES = ["OpenSkyAPI", "AviationWeatherAPI"]
+PARAM_CONTEXT_NAME = os.environ.get('NIFI_PARAM_CONTEXT', 'flight-kafka')
+KAFKA_BOOTSTRAP_SERVERS = os.environ.get('KAFKA_BOOTSTRAP_SERVERS', 'kafka-broker-headless.kafka.svc.cluster.local:9092')
+OPENSKY_CLIENT_SECRET = os.environ.get('OPENSKY_CLIENT_SECRET', '')
 
 WAIT_TIMEOUT = 180  # seconds
 
@@ -73,6 +76,154 @@ def get_nifi_token(nifi_url, username, password, cert_path):
     
     # The response body is the raw JWT token
     return response.text
+
+def list_parameter_contexts(nifi_url, token, verify_ssl):
+    url = f"{nifi_url}/nifi-api/parameter-contexts"
+    headers = {
+        'Authorization': f'Bearer {token}'
+    }
+    response = requests.get(url, headers=headers, verify=verify_ssl)
+    response.raise_for_status()
+    return response.json().get('parameterContexts', [])
+
+def get_parameter_context(nifi_url, token, verify_ssl, context_id):
+    url = f"{nifi_url}/nifi-api/parameter-contexts/{context_id}"
+    headers = {
+        'Authorization': f'Bearer {token}'
+    }
+    response = requests.get(url, headers=headers, verify=verify_ssl)
+    response.raise_for_status()
+    return response.json()
+
+def upsert_parameter_context(nifi_url, token, verify_ssl, name, parameters):
+    param_list = [
+        {'parameter': {'name': key, 'value': value, 'sensitive': False}}
+        for key, value in parameters.items()
+    ]
+    for ctx in list_parameter_contexts(nifi_url, token, verify_ssl):
+        if ctx.get('component', {}).get('name') == name:
+            context_id = ctx.get('id')
+            current = get_parameter_context(nifi_url, token, verify_ssl, context_id)
+            payload = {
+                'revision': current.get('revision'),
+                'component': {
+                    'id': context_id,
+                    'name': name,
+                    'parameters': param_list,
+                    'inheritedParameterContexts': current.get('component', {}).get('inheritedParameterContexts', [])
+                }
+            }
+            url = f"{nifi_url}/nifi-api/parameter-contexts/{context_id}"
+            headers = {
+                'Authorization': f'Bearer {token}'
+            }
+            response = requests.put(url, headers=headers, json=payload, verify=verify_ssl)
+            response.raise_for_status()
+            return context_id
+
+    payload = {
+        'revision': {'version': 0},
+        'component': {
+            'name': name,
+            'parameters': param_list
+        }
+    }
+    url = f"{nifi_url}/nifi-api/parameter-contexts"
+    headers = {
+        'Authorization': f'Bearer {token}'
+    }
+    response = requests.post(url, headers=headers, json=payload, verify=verify_ssl)
+    response.raise_for_status()
+    return response.json().get('id')
+
+def assign_parameter_context(nifi_url, token, verify_ssl, pg_id, context_id):
+    url = f"{nifi_url}/nifi-api/process-groups/{pg_id}"
+    headers = {
+        'Authorization': f'Bearer {token}'
+    }
+    current = requests.get(url, headers=headers, verify=verify_ssl)
+    current.raise_for_status()
+    current_json = current.json()
+    current_context = current_json.get('component', {}).get('parameterContext')
+    if current_context and current_context.get('id') == context_id:
+        return
+    payload = {
+        'revision': current_json.get('revision'),
+        'component': {
+            'id': pg_id,
+            'parameterContext': {'id': context_id}
+        }
+    }
+    response = requests.put(url, headers=headers, json=payload, verify=verify_ssl)
+    response.raise_for_status()
+
+def get_process_group_entity(nifi_url, token, verify_ssl, pg_id):
+    url = f"{nifi_url}/nifi-api/process-groups/{pg_id}"
+    headers = {
+        'Authorization': f'Bearer {token}'
+    }
+    response = requests.get(url, headers=headers, verify=verify_ssl)
+    response.raise_for_status()
+    return response.json()
+
+def delete_process_group(nifi_url, token, verify_ssl, pg_id, timeout=60):
+    headers = {
+        'Authorization': f'Bearer {token}'
+    }
+    entity = get_process_group_entity(nifi_url, token, verify_ssl, pg_id)
+    revision = entity.get('revision', {})
+    version = revision.get('version', 0)
+    client_id = revision.get('clientId', str(uuid.uuid4()))
+    params = {
+        'version': version,
+        'clientId': client_id,
+        'disconnectedNodeAcknowledged': 'true'
+    }
+    url = f"{nifi_url}/nifi-api/process-groups/{pg_id}"
+    response = requests.delete(url, headers=headers, params=params, verify=verify_ssl)
+    response.raise_for_status()
+
+    start = time.time()
+    while time.time() - start < timeout:
+        try:
+            requests.get(url, headers=headers, verify=verify_ssl, timeout=5).raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            if e.response is not None and e.response.status_code == 404:
+                return
+        time.sleep(2)
+    raise RuntimeError(f"Timed out waiting for process group {pg_id} deletion.")
+
+def list_connections_in_pg(nifi_url, token, verify_ssl, pg_id):
+    url = f"{nifi_url}/nifi-api/flow/process-groups/{pg_id}"
+    headers = {
+        'Authorization': f'Bearer {token}'
+    }
+    response = requests.get(url, headers=headers, verify=verify_ssl)
+    response.raise_for_status()
+    connections = response.json().get('processGroupFlow', {}).get('flow', {}).get('connections', [])
+    return [conn.get('id') for conn in connections if conn.get('id')]
+
+def drop_connection_queue(nifi_url, token, verify_ssl, connection_id, timeout=120):
+    headers = {
+        'Authorization': f'Bearer {token}'
+    }
+    url = f"{nifi_url}/nifi-api/flowfile-queues/{connection_id}/drop-requests"
+    response = requests.post(url, headers=headers, json={'acknowledge': True}, verify=verify_ssl)
+    response.raise_for_status()
+    drop_request = response.json().get('dropRequest', {})
+    drop_id = drop_request.get('id')
+    if not drop_id:
+        return
+    status_url = f"{nifi_url}/nifi-api/flowfile-queues/{connection_id}/drop-requests/{drop_id}"
+    start = time.time()
+    while time.time() - start < timeout:
+        status_resp = requests.get(status_url, headers=headers, verify=verify_ssl)
+        status_resp.raise_for_status()
+        status = status_resp.json().get('dropRequest', {})
+        if status.get('finished'):
+            break
+        time.sleep(2)
+    requests.delete(status_url, headers=headers, verify=verify_ssl)
 
 def upload_flow_via_api(nifi_url, parent_pg_id, group_name, client_id, token, file_path, verify_ssl):
     """
@@ -137,10 +288,10 @@ def upload_flow_via_api(nifi_url, parent_pg_id, group_name, client_id, token, fi
         if 'file' in files and files['file'][1]:
             files['file'][1].close()
 
-def start_controller_service_run_status(nifi_url, service_id, current_revision, token, verify_ssl):
+def set_controller_service_run_status(nifi_url, service_id, current_revision, token, verify_ssl, state):
     """
-    Sets the Controller Service's state to ENABLED using the /run-status endpoint.
-    This is equivalent to clicking the Start/Enable button in the UI.
+    Sets the Controller Service's state using the /run-status endpoint.
+    This is equivalent to clicking the Start/Stop button in the UI.
     """
     url = f"{nifi_url}/nifi-api/controller-services/{service_id}/run-status"
     headers = {
@@ -150,12 +301,12 @@ def start_controller_service_run_status(nifi_url, service_id, current_revision, 
 
     payload = {
         'revision': current_revision,
-        'state': 'ENABLED', # This is the critical field for the new state
+        'state': state,
         'disconnectedNodeAcknowledged': 'true',
         'uiOnly': 'true'
     }
     
-    print(f"Setting Controller Service {service_id} state to ENABLED via /run-status...")
+    print(f"Setting Controller Service {service_id} state to {state} via /run-status...")
     put_response = requests.put(
         url,
         headers=headers,
@@ -164,8 +315,12 @@ def start_controller_service_run_status(nifi_url, service_id, current_revision, 
     )
     put_response.raise_for_status()
     print("✅ Controller Service updated. Check status for initialization.")
-    
-    return put_response.json()
+
+def start_controller_service_run_status(nifi_url, service_id, current_revision, token, verify_ssl):
+    set_controller_service_run_status(nifi_url, service_id, current_revision, token, verify_ssl, "ENABLED")
+
+def stop_controller_service_run_status(nifi_url, service_id, current_revision, token, verify_ssl):
+    set_controller_service_run_status(nifi_url, service_id, current_revision, token, verify_ssl, "DISABLED")
 
 def extract_controller_service_ids(pg_dict):
     # Controller Services are referenced inside the processors' configuration.
@@ -214,6 +369,109 @@ def get_controller_service_revision(nifi_url, service_id, token, verify_ssl):
     except requests.exceptions.RequestException as e:
         print(f"Network error fetching revision for {service_id}: {e}")
         raise
+
+def update_controller_service_properties(nifi_url, service_id, token, verify_ssl, updates, allow_missing=False):
+    url = f"{nifi_url}/nifi-api/controller-services/{service_id}"
+    headers = {
+        'Authorization': f'Bearer {token}'
+    }
+    current = requests.get(url, headers=headers, verify=verify_ssl)
+    current.raise_for_status()
+    current_json = current.json()
+    component = current_json.get('component', {})
+    properties = component.get('properties', {}) or {}
+    if not allow_missing and not any(key in properties for key in updates.keys()):
+        return False
+    properties.update(updates)
+    payload = {
+        'revision': current_json.get('revision'),
+        'component': {
+            'id': service_id,
+            'properties': properties
+        }
+    }
+    response = requests.put(url, headers=headers, json=payload, verify=verify_ssl)
+    try:
+        response.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        detail = response.text.strip()
+        print(f"WARNING: Failed to update controller service {service_id}: {e}. {detail}")
+        return False
+    return True
+
+def update_kafka_controller_service(nifi_url, service_id, token, verify_ssl, bootstrap_servers):
+    url = f"{nifi_url}/nifi-api/controller-services/{service_id}"
+    headers = {
+        'Authorization': f'Bearer {token}'
+    }
+    current = requests.get(url, headers=headers, verify=verify_ssl)
+    current.raise_for_status()
+    properties = current.json().get('component', {}).get('properties', {}) or {}
+    if 'bootstrap.servers' not in properties:
+        return False
+    cs_revision = get_controller_service_revision(nifi_url, service_id, token, verify_ssl)
+    stop_controller_service_run_status(nifi_url, service_id, cs_revision, token, verify_ssl)
+    updated = update_controller_service_properties(
+        nifi_url,
+        service_id,
+        token,
+        verify_ssl,
+        {'bootstrap.servers': bootstrap_servers}
+    )
+    cs_revision = get_controller_service_revision(nifi_url, service_id, token, verify_ssl)
+    start_controller_service_run_status(nifi_url, service_id, cs_revision, token, verify_ssl)
+    return updated
+
+def list_controller_services_in_pg(nifi_url, token, verify_ssl, pg_id):
+    url = f"{nifi_url}/nifi-api/flow/process-groups/{pg_id}/controller-services"
+    headers = {
+        'Authorization': f'Bearer {token}'
+    }
+    response = requests.get(url, headers=headers, verify=verify_ssl)
+    response.raise_for_status()
+    services = response.json().get('controllerServices', [])
+    return [svc.get('id') for svc in services if svc.get('id')]
+
+def list_controller_service_entities_in_pg(nifi_url, token, verify_ssl, pg_id):
+    url = f"{nifi_url}/nifi-api/flow/process-groups/{pg_id}/controller-services"
+    headers = {
+        'Authorization': f'Bearer {token}'
+    }
+    response = requests.get(url, headers=headers, verify=verify_ssl)
+    response.raise_for_status()
+    return response.json().get('controllerServices', [])
+
+def update_oauth2_controller_services(nifi_url, token, verify_ssl, pg_id, client_secret):
+    if not client_secret:
+        print("OPENSKY_CLIENT_SECRET not set; skipping OAuth2 controller service update.")
+        return
+    services = list_controller_service_entities_in_pg(nifi_url, token, verify_ssl, pg_id)
+    for svc in services:
+        component = svc.get('component', {})
+        svc_type = component.get('type')
+        svc_name = component.get('name')
+        if svc_type == "org.apache.nifi.oauth2.StandardOauth2AccessTokenProvider" or svc_name == "StandardOauth2AccessTokenProvider":
+            cs_revision = get_controller_service_revision(nifi_url, svc.get('id'), token, verify_ssl)
+            stop_controller_service_run_status(nifi_url, svc.get('id'), cs_revision, token, verify_ssl)
+            updated = update_controller_service_properties(
+                nifi_url,
+                svc.get('id'),
+                token,
+                verify_ssl,
+                {"Client secret": client_secret, "Client Secret": client_secret},
+                allow_missing=True
+            )
+            if updated:
+                print(f"Updated OAuth2 client secret for controller service {svc.get('id')}")
+            cs_revision = get_controller_service_revision(nifi_url, svc.get('id'), token, verify_ssl)
+            start_controller_service_run_status(nifi_url, svc.get('id'), cs_revision, token, verify_ssl)
+
+def normalize_process_groups(pg_lookup):
+    if pg_lookup is None:
+        return []
+    if isinstance(pg_lookup, list):
+        return [pg for pg in pg_lookup if pg is not None]
+    return [pg_lookup]
 
 def main():
     try:
@@ -300,6 +558,14 @@ def main():
             username=NIFI_USER,
             password=NIFI_PASS
         )
+        # Mitigate occasional JWT "before use time" errors from clock skew.
+        time.sleep(5)
+
+        token = get_nifi_token(f"{NIFI_API_BASE_URL}/nifi-api", NIFI_USER, NIFI_PASS, cert_path=not INSECURE)
+        print("Obtained NiFi token for upload.", token[:10] + "...")
+        param_values = {
+            'kafka.bootstrap.servers': KAFKA_BOOTSTRAP_SERVERS
+        }
 
         for PG_NAME in PG_NAMES:
         # Check or create process group to import into
@@ -307,91 +573,125 @@ def main():
             print(f"Checking for existing Process Group named '{PG_NAME}'...")
             pg = canvas.get_process_group(PG_NAME, 'name')
             print("Process group lookup result:", end=' ')
-            if isinstance(pg, list):
-                print(pg[0])
-                for p in pg:
+            existing_pgs = normalize_process_groups(pg)
+            kept_pgs = []
+            if existing_pgs:
+                print(existing_pgs[0])
+                for p in existing_pgs:
                     print(f" {p.id}", end=',')
                 print()
-            elif pg is not None:
-                component = pg.component
+            else:
+                print("None")
+
+            for existing_pg in existing_pgs:
+                component = existing_pg.component
                 if component.parameter_context:
                     print(f"{component.parameter_context}")
                 else:
                     print("No parameter context")
 
-            if pg is None:
-                root_pg_id = canvas.get_root_pg_id()
-                print("Root PG id:", root_pg_id)
+            # if pg is None:
+            root_pg_id = canvas.get_root_pg_id()
+            print("Root PG id:", root_pg_id)
 
-                # Load flow content from file if exists
-                flow_file = Path(FLOW_PATH_HOST)
-                flow_content_dict = None
-                if flow_file.exists():
-                    print(f"Found existing flow content file at {flow_file}. Using it for import.")
-                    with open(flow_file, 'r') as f:
-                        flow_content_dict = json.load(f)
-                else:
-                    raise RuntimeError(f"Flow content file not found at {flow_file}")
+            # Load flow content from file if exists
+            flow_file = Path(f"/flows/{PG_NAME}.json")
+            flow_content_dict = None
+            if flow_file.exists():
+                print(f"Found existing flow content file at {flow_file}. Using it for import.")
+                with open(flow_file, 'r') as f:
+                    flow_content_dict = json.load(f)
+            else:
+                raise RuntimeError(f"Flow content file not found at {flow_file}")
 
-                # Create or get a registry bucket
-                BUCKET_NAME = "auto-deploy-bucket"
-                print("Ensuring Registry bucket exists:", BUCKET_NAME)
-                bucket_api = registry.apis.buckets_api.BucketsApi()
-                buckets = bucket_api.get_buckets()
-                bucket = None
-                if buckets:
-                    for b in buckets:
-                        if b.name == BUCKET_NAME:
-                            bucket = b
-                            break
-
-                if bucket is None:
-                    print("Creating registry bucket...")
-                    new_bucket = registry.models.Bucket(name=BUCKET_NAME)
-                    bucket = bucket_api.create_bucket(new_bucket)
-                    print("Created bucket:", bucket.identifier, bucket.name)
-                else:
-                    print("Found bucket:", bucket.identifier, bucket.name)
-
-                registry_client = versioning.get_registry_client('my-registry-client', 'name')
-                if registry_client is None:
-                    registry_client = versioning.create_registry_client(
-                        name='my-registry-client',
-                        uri=config.registry_config.host,
-                        description='Client for my flows'
-                    )
-
-                # Import the flow JSON into the bucket (using flow content JSON)
-                FLOW_NAME = PG_NAME # Name for the versioned flow in the Registry
-
-                # --- FLOW EXISTENCE CHECK & VERSIONING LOGIC (IDEMPOTENT) ---
-                # Check if flow container already exists in bucket
-                flow_list = registry.apis.bucket_flows_api.BucketFlowsApi().get_flows(bucket.identifier)
-                imported = None
-                for flow in flow_list:
-                    if flow.name == FLOW_NAME:
-                        imported = flow
+            # Create or get a registry bucket
+            BUCKET_NAME = "auto-deploy-bucket"
+            print("Ensuring Registry bucket exists:", BUCKET_NAME)
+            bucket_api = registry.apis.buckets_api.BucketsApi()
+            buckets = bucket_api.get_buckets()
+            bucket = None
+            if buckets:
+                for b in buckets:
+                    if b.name == BUCKET_NAME:
+                        bucket = b
                         break
 
+            if bucket is None:
+                print("Creating registry bucket...")
+                new_bucket = registry.models.Bucket(name=BUCKET_NAME)
+                bucket = bucket_api.create_bucket(new_bucket)
+                print("Created bucket:", bucket.identifier, bucket.name)
+            else:
+                print("Found bucket:", bucket.identifier, bucket.name)
 
-                if imported is None:
-                    # Case 1: Flow container does not exist. Create container and version 1.
-                    print(f"Flow '{FLOW_NAME}' not found. Creating new flow container and version 1.")
-                    
-                    flow_body = registry.models.VersionedFlow(
+            registry_client = versioning.get_registry_client('my-registry-client', 'name')
+            if registry_client is None:
+                registry_client = versioning.create_registry_client(
+                    name='my-registry-client',
+                    uri=config.registry_config.host,
+                    description='Client for my flows'
+                )
+
+            # Import the flow JSON into the bucket (using flow content JSON)
+            FLOW_NAME = PG_NAME # Name for the versioned flow in the Registry
+
+            # --- FLOW EXISTENCE CHECK & VERSIONING LOGIC (IDEMPOTENT) ---
+            # Check if flow container already exists in bucket
+            flow_list = registry.apis.bucket_flows_api.BucketFlowsApi().get_flows(bucket.identifier)
+            imported = None
+            for flow in flow_list:
+                if flow.name == FLOW_NAME:
+                    imported = flow
+                    break
+
+
+            if imported is None:
+                # Case 1: Flow container does not exist. Create container and version 1.
+                print(f"Flow '{FLOW_NAME}' not found. Creating new flow container and version 1.")
+                
+                flow_body = registry.models.VersionedFlow(
+                    bucket_identifier=bucket.identifier,
+                    bucket_name=bucket.name,
+                    name=FLOW_NAME,
+                    description='Initial import of flow content from NiFi root canvas.',
+                    type='Flow'
+                )
+                imported = registry.apis.bucket_flows_api.BucketFlowsApi().create_flow(
+                    body=flow_body,
+                    bucket_id=bucket.identifier
+                )
+                print("Imported flow container. Registry flow id:", imported.identifier)
+                
+                # Explicitly Save Version 1
+                versioned_flow_snapshot = registry.models.VersionedFlowSnapshot(
+                    flow_contents=flow_content_dict,
+                    snapshot_metadata=registry.models.VersionedFlowSnapshotMetadata(
+                        author="ankhanhtran02",
                         bucket_identifier=bucket.identifier,
-                        bucket_name=bucket.name,
-                        name=FLOW_NAME,
-                        description='Initial import of flow content from NiFi root canvas.',
-                        type='Flow'
+                        flow_identifier=imported.identifier,
                     )
-                    imported = registry.apis.bucket_flows_api.BucketFlowsApi().create_flow(
-                        body=flow_body,
-                        bucket_id=bucket.identifier
-                    )
-                    print("Imported flow container. Registry flow id:", imported.identifier)
+                )
+
+                versioned_flow_snapshot_json = utils.dump(versioned_flow_snapshot)
                     
-                    # Explicitly Save Version 1
+                saved_version = versioning.import_flow_version(
+                    bucket_id=bucket.identifier,
+                    flow_id=imported.identifier,
+                    encoded_flow=versioned_flow_snapshot_json,
+                )
+                version_number = saved_version.snapshot_metadata.version
+                print(f"Saved version {version_number} successfully.")
+
+            else:
+                # Case 2: Flow container exists. Check for change.
+                print(f"Flow '{FLOW_NAME}' found. Checking if new version is required.")
+                
+
+                versions = registry.apis.flows_api.FlowsApi().get_flow_versions1(imported.identifier)
+                
+                if not versions:
+                    # Fallback in case of a corrupted flow container (no versions)
+                    print("WARNING: Flow found but has no versions. Saving version 1.")
                     versioned_flow_snapshot = registry.models.VersionedFlowSnapshot(
                         flow_contents=flow_content_dict,
                         snapshot_metadata=registry.models.VersionedFlowSnapshotMetadata(
@@ -402,7 +702,6 @@ def main():
                     )
 
                     versioned_flow_snapshot_json = utils.dump(versioned_flow_snapshot)
-                        
                     saved_version = versioning.import_flow_version(
                         bucket_id=bucket.identifier,
                         flow_id=imported.identifier,
@@ -410,68 +709,40 @@ def main():
                     )
                     version_number = saved_version.snapshot_metadata.version
                     print(f"Saved version {version_number} successfully.")
+            
+            
 
-                else:
-                    # Case 2: Flow container exists. Check for change.
-                    print(f"Flow '{FLOW_NAME}' found. Checking if new version is required.")
-                    
+            token = get_nifi_token(f"{NIFI_API_BASE_URL}/nifi-api", NIFI_USER, NIFI_PASS, cert_path=not INSECURE)
+            print("Obtained NiFi token for upload.", token[:10] + "...")
 
-                    versions = registry.apis.flows_api.FlowsApi().get_flow_versions1(imported.identifier)
-                    
-                    if not versions:
-                        # Fallback in case of a corrupted flow container (no versions)
-                        print("WARNING: Flow found but has no versions. Saving version 1.")
-                        versioned_flow_snapshot = registry.models.VersionedFlowSnapshot(
-                            flow_contents=flow_content_dict,
-                            snapshot_metadata=registry.models.VersionedFlowSnapshotMetadata(
-                                author="ankhanhtran02",
-                                bucket_identifier=bucket.identifier,
-                                flow_identifier=imported.identifier,
-                            )
-                        )
+            # print(versioned_flow_snapshot_json)
+            pg = upload_flow_via_api(
+                nifi_url=NIFI_API_BASE_URL,
+                parent_pg_id=root_pg_id,
+                client_id=str(uuid.uuid4()),
+                file_path=flow_file,
+                group_name=PG_NAME,
+                token=token,
+                verify_ssl=not INSECURE
+            )
+            controller_service_ids = extract_controller_service_ids(pg)
+            print("Found controller services: ", controller_service_ids)
+            for cs in controller_service_ids:
+                cs_revision = get_controller_service_revision(NIFI_API_BASE_URL, cs, token, not INSECURE)
+                start_controller_service_run_status(NIFI_API_BASE_URL, cs, cs_revision, token, not INSECURE)
 
-                        versioned_flow_snapshot_json = utils.dump(versioned_flow_snapshot)
-                        saved_version = versioning.import_flow_version(
-                            bucket_id=bucket.identifier,
-                            flow_id=imported.identifier,
-                            encoded_flow=versioned_flow_snapshot_json,
-                        )
-                        version_number = saved_version.snapshot_metadata.version
-                        print(f"Saved version {version_number} successfully.")
-                
-                
-
-                token = get_nifi_token(f"{NIFI_API_BASE_URL}/nifi-api", NIFI_USER, NIFI_PASS, cert_path=not INSECURE)
-                print("Obtained NiFi token for upload.", token[:10] + "...")
-
-                # print(versioned_flow_snapshot_json)
-                pg = upload_flow_via_api(
-                    nifi_url=NIFI_API_BASE_URL,
-                    parent_pg_id=root_pg_id,
-                    client_id=str(uuid.uuid4()),
-                    file_path=FLOW_PATH_HOST,
-                    group_name=PG_NAME,
-                    token=token,
-                    verify_ssl=not INSECURE
-                )
-                controller_service_ids = extract_controller_service_ids(pg)
-                print("Found controller services: ", controller_service_ids)
-                for cs in controller_service_ids:
-                    cs_revision = get_controller_service_revision(NIFI_API_BASE_URL, cs, token, not INSECURE)
-                    start_controller_service_run_status(NIFI_API_BASE_URL, cs, cs_revision, token, not INSECURE)
-
-                # Attempt to locate the created process group and schedule it
-                time.sleep(2)
-                # find process groups with our name under root
-                new_pg = canvas.get_process_group(pg["id"], 'id', False)
-                if new_pg is None:
-                    raise RuntimeError("Failed to find the instantiated process group after deployment.")
-                else:
-                    print("Found instantiated process group:", new_pg.id, new_pg.component.name)
-                
+            # Attempt to locate the created process group and schedule it
+            time.sleep(2)
+            # find process groups with our name under root
+            new_pg = canvas.get_process_group(pg["id"], 'id', False)
+            if new_pg is None:
+                raise RuntimeError("Failed to find the instantiated process group after deployment.")
             else:
-                print("Process group already exists:", pg.id)
-                new_pg = pg
+                print("Found instantiated process group:", new_pg.id, new_pg.component.name)
+                
+            # else:
+            #     print("Process group already exists:", pg.id)
+            #     new_pg = pg
 
             print("Scheduling (starting) process group:", new_pg.id)
             canvas.schedule_process_group(new_pg.id, True)

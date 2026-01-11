@@ -44,15 +44,15 @@ spec:
         resources:
           limits:
             cpu: "2"
-            memory: 4Gi
+            memory: 3Gi
           requests:
             cpu: "1"
-            memory: 4Gi
+            memory: 2Gi
         env:
         - name: MAX_HEAP_SIZE
-          value: "2G"
+          value: "1G"
         - name: HEAP_NEWSIZE
-          value: "512M"
+          value: "256M"
         - name: CASSANDRA_CLUSTER_NAME
           value: "FlightAnalytics"
         - name: CASSANDRA_DC

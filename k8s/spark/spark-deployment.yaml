@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spark-stream
+  namespace: spark
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spark-stream
+  template:
+    metadata:
+      labels:
+        app: spark-stream
+    spec:
+      containers:
+      - name: spark-stream
+        image: flight-data-spark:latest
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          runAsUser: 0
+          runAsGroup: 0
+        command:
+        - /opt/spark/bin/spark-submit
+        args:
+        - --master
+        - local[4]
+        - --packages
+        - org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.0,com.datastax.spark:spark-cassandra-connector_2.12:3.4.1,org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262
+        - /app/spark/reader.py
+        env:
+        - name: USER
+          value: spark
+        - name: HADOOP_USER_NAME
+          value: spark
+        - name: SPARK_USER
+          value: spark
+        - name: HOME
+          value: /tmp
+        - name: SPARK_SUBMIT_OPTS
+          value: "-Divy.home=/tmp/.ivy2 -Divy.cache.dir=/tmp/.ivy2"
+        envFrom:
+        - configMapRef:
+            name: spark-stream-config
+        - secretRef:
+            name: spark-stream-secrets
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "2Gi"
+          limits:
+            cpu: "1"
+            memory: "3Gi"

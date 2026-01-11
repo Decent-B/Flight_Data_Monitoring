@@ -1,0 +1,127 @@
+# Kafka Helm Values for EKS
+# Bitnami Kafka chart with KRaft mode, 3 brokers, data retention policies
+#
+# Key features:
+# - 3 controller/broker replicas for HA
+# - 24-hour log retention (prevents disk overflow)
+# - 1GB max per partition (prevents unbounded growth)
+# - Resource limits tuned for t3.medium nodes
+# - Tolerations for kafka-nodes taint
+
+# Use combined controller+broker mode (KRaft)
+controller:
+  replicaCount: 3
+  
+  # Resources for t3.medium (2 vCPU, 4Gi RAM)
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: "1"
+      memory: 3Gi
+  
+  # Persistence
+  persistence:
+    enabled: true
+    storageClass: ebs-gp3-kafka
+    size: 10Gi
+  
+  # Node selection
+  nodeSelector:
+    role: kafka
+  
+  # Tolerations for dedicated Kafka nodes
+  tolerations:
+    - key: dedicated
+      operator: Equal
+      value: kafka
+      effect: NoSchedule
+  
+  # Pod anti-affinity for HA
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/component: controller
+          topologyKey: kubernetes.io/hostname
+  
+  # Kafka broker configuration
+  extraConfig: |
+    # Log retention - 24 hours
+    log.retention.hours=24
+    log.retention.bytes=1073741824
+    log.retention.check.interval.ms=300000
+    
+    # Segment settings
+    log.segment.bytes=536870912
+    log.segment.delete.delay.ms=60000
+    
+    # Replication settings for single-broker topics
+    offsets.topic.replication.factor=3
+    transaction.state.log.replication.factor=3
+    transaction.state.log.min.isr=2
+    default.replication.factor=3
+    min.insync.replicas=2
+    
+    # Performance tuning
+    num.network.threads=3
+    num.io.threads=8
+    socket.send.buffer.bytes=102400
+    socket.receive.buffer.bytes=102400
+    socket.request.max.bytes=104857600
+    
+    # Message settings
+    message.max.bytes=10485760
+    replica.fetch.max.bytes=10485760
+
+# No separate broker nodes in combined mode
+broker:
+  replicaCount: 0
+
+# Listeners
+listeners:
+  client:
+    protocol: PLAINTEXT
+  controller:
+    protocol: PLAINTEXT
+  interbroker:
+    protocol: PLAINTEXT
+
+# KRaft mode (no ZooKeeper)
+kraft:
+  enabled: true
+
+# Metrics for monitoring
+metrics:
+  kafka:
+    enabled: true
+  jmx:
+    enabled: true
+
+# Service configuration
+service:
+  type: ClusterIP
+  ports:
+    client: 9092
+
+# Pod Disruption Budget for HA
+pdb:
+  create: true
+  minAvailable: 2
+
+# Security context
+podSecurityContext:
+  fsGroup: 1001
+containerSecurityContext:
+  runAsUser: 1001
+  runAsNonRoot: true
+
+# RBAC
+rbac:
+  create: true
+  
+# Service Account
+serviceAccount:
+  create: true

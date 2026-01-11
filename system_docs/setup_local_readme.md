@@ -192,7 +192,7 @@ docker-compose -f docker-nifi.yml logs -f nifi
 
 Look for: `NiFi has started`
 
-Access NiFi UI: **https://localhost:8443/nifi/**
+Access NiFi UI: **https://<nifi-host>:8443/nifi/**
 
 > **Note:** You'll see a security warning (self-signed certificate). This is expected—click "Advanced" and proceed.
 
@@ -211,7 +211,7 @@ docker-compose -f docker-spark.yml up -d
 docker logs -f spark
 ```
 
-Access Spark UI: **http://localhost:4040**
+Access Spark UI: **http://<spark-host>:4040**
 
 ---
 
@@ -219,7 +219,7 @@ Access Spark UI: **http://localhost:4040**
 
 ### MinIO Console
 
-**Access:** http://localhost:9090
+**Access:** http://<minio-host>:9090
 
 **Login:**
 - Username: `minioadmin`
@@ -235,17 +235,17 @@ Access Spark UI: **http://localhost:4040**
 
 **List topics:**
 ```powershell
-docker exec -it kafka-broker-1 kafka-topics --bootstrap-server localhost:9092 --list
+docker exec -it kafka-broker-1 kafka-topics --bootstrap-server kafka-broker-1:9092 --list
 ```
 
 **Create a topic manually:**
 ```powershell
-docker exec -it kafka-broker-1 kafka-topics --bootstrap-server localhost:9092 --create --topic flight-events --partitions 3 --replication-factor 3
+docker exec -it kafka-broker-1 kafka-topics --bootstrap-server kafka-broker-1:9092 --create --topic flight-events --partitions 3 --replication-factor 3
 ```
 
 **Check topic details:**
 ```powershell
-docker exec -it kafka-broker-1 kafka-topics --bootstrap-server localhost:9092 --describe --topic flight-events
+docker exec -it kafka-broker-1 kafka-topics --bootstrap-server kafka-broker-1:9092 --describe --topic flight-events
 ```
 
 ### Cassandra Management
@@ -291,13 +291,13 @@ This shows all connected containers.
 docker exec minio mc admin info local
 
 # Kafka health
-docker exec kafka-broker-1 kafka-broker-api-versions --bootstrap-server localhost:9092
+docker exec kafka-broker-1 kafka-broker-api-versions --bootstrap-server kafka-broker-1:9092
 
 # Cassandra health
 docker exec cassandra-1 nodetool status
 
 # NiFi health (should return 200)
-curl -k https://localhost:8443/nifi/
+curl -k https://<nifi-host>:8443/nifi/
 
 # Spark health (check if logs are flowing)
 docker logs spark --tail 50
@@ -398,7 +398,7 @@ docker-compose -f docker-kafka.yml restart
 **Check dependencies:**
 ```powershell
 # Ensure Kafka is up
-docker exec kafka-broker-1 kafka-broker-api-versions --bootstrap-server localhost:9092
+docker exec kafka-broker-1 kafka-broker-api-versions --bootstrap-server kafka-broker-1:9092
 
 # Ensure Cassandra is up
 docker exec cassandra-1 nodetool status
@@ -466,9 +466,9 @@ docker volume ls
 You'll know the system is fully operational when:
 
 ✅ All containers show status "Up" in `docker ps`  
-✅ MinIO Console is accessible at http://localhost:9090  
-✅ NiFi UI is accessible at https://localhost:8443/nifi/  
-✅ Spark UI is accessible at http://localhost:4040  
+✅ MinIO Console is accessible at http://<minio-host>:9090  
+✅ NiFi UI is accessible at https://<nifi-host>:8443/nifi/  
+✅ Spark UI is accessible at http://<spark-host>:4040  
 ✅ Cassandra cluster shows 3 nodes in UN (Up/Normal) state  
 ✅ Kafka has all 3 brokers connected  
 ✅ No repeated error messages in any container logs  

@@ -1,0 +1,30 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: nifi
+
+resources:
+  - namespace.yaml
+  - nifi-secret.yaml
+  - nifi-configmap.yaml
+  - nifi-pvc.yaml
+  - nifi-deployment.yaml
+  - nifi-service.yaml
+  - nifi-registry-deployment.yaml
+  - nifi-registry-service.yaml
+  - nifi-flow-deployer-job.yaml
+
+configMapGenerator:
+  - name: nifi-flows
+    files:
+      - ../../nifi/flows/OpenSkyAPI.json
+      - ../../nifi/flows/AviationWeatherAPI.json
+  - name: nifi-deployer-scripts
+    files:
+      - ../../nifi/scripts/deploy_flow.py
+  - name: nifi-api-params
+    files:
+      - ../../nifi/api_params/airports_icao.txt
+
+generatorOptions:
+  disableNameSuffixHash: true

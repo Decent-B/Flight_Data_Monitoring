@@ -1,0 +1,113 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spark-stream
+  namespace: spark
+  labels:
+    app: spark-stream
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spark-stream
+  template:
+    metadata:
+      labels:
+        app: spark-stream
+    spec:
+      serviceAccountName: spark-sa
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: workload
+                operator: In
+                values:
+                - data
+      tolerations:
+        - key: "cloud.google.com/gke-spot"
+          operator: "Equal"
+          value: "true"
+          effect: "NoSchedule"
+      containers:
+      - name: spark-stream
+        image: REPLACE_WITH_GCP_REGION-docker.pkg.dev/REPLACE_WITH_PROJECT_ID/flight-data/spark:latest
+        imagePullPolicy: Always
+        resources:
+          requests:
+            cpu: 500m
+            memory: 2Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        env:
+          - name: KAFKA_BOOTSTRAP_SERVERS
+            valueFrom:
+              configMapKeyRef:
+                name: spark-config
+                key: KAFKA_BOOTSTRAP_SERVERS
+          - name: KAFKA_TOPIC_INPUT
+            valueFrom:
+              configMapKeyRef:
+                name: spark-config
+                key: KAFKA_TOPIC_INPUT
+          - name: KAFKA_TOPIC_OUTPUT
+            valueFrom:
+              configMapKeyRef:
+                name: spark-config
+                key: KAFKA_TOPIC_OUTPUT
+          - name: CASSANDRA_HOST
+            valueFrom:
+              configMapKeyRef:
+                name: spark-config
+                key: CASSANDRA_HOST
+          - name: CASSANDRA_PORT
+            valueFrom:
+              configMapKeyRef:
+                name: spark-config
+                key: CASSANDRA_PORT
+          - name: CASSANDRA_KEYSPACE
+            valueFrom:
+              configMapKeyRef:
+                name: spark-config
+                key: CASSANDRA_KEYSPACE
+          - name: CASSANDRA_DATACENTER
+            valueFrom:
+              configMapKeyRef:
+                name: spark-config
+                key: CASSANDRA_DATACENTER
+          - name: GCS_CHECKPOINT_PATH
+            valueFrom:
+              configMapKeyRef:
+                name: spark-config
+                key: GCS_CHECKPOINT_PATH
+          - name: CASSANDRA_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: spark-secret
+                key: CASSANDRA_USERNAME
+          - name: CASSANDRA_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: spark-secret
+                key: CASSANDRA_PASSWORD
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - ps aux | grep spark-submit
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - ps aux | grep spark-submit
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5

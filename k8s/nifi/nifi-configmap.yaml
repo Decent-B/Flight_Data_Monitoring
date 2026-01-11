@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nifi-config
+  namespace: nifi
+data:
+  KAFKA_BOOTSTRAP_SERVERS: kafka-broker-headless.kafka.svc.cluster.local:9092
+  NIFI_PARAM_CONTEXT: flight-kafka
