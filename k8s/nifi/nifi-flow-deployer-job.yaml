@@ -1,0 +1,67 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: nifi-flow-deployer
+  namespace: nifi
+spec:
+  template:
+    metadata:
+      labels:
+        app: nifi-flow-deployer
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: flow-deployer
+          image: python:3.11-slim
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "500m"
+              memory: "1Gi"
+          env:
+            - name: NIFI_API_URL
+              value: https://nifi:8443
+            - name: REGISTRY_API_URL
+              value: http://nifi-registry:18080
+            - name: NIFI_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: nifi-credentials
+                  key: NIFI_SINGLE_USER_USERNAME
+            - name: NIFI_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: nifi-credentials
+                  key: NIFI_SINGLE_USER_PASSWORD
+            - name: INSECURE_SKIP_TLS_VERIFY
+              value: "true"
+            - name: OPENSKY_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: nifi-credentials
+                  key: OPENSKY_CLIENT_SECRET
+          envFrom:
+            - configMapRef:
+                name: nifi-config
+          command:
+            - bash
+            - -c
+            - |
+              set -euo pipefail
+              pip install --no-cache-dir nipyapi requests
+              python /scripts/deploy_flow.py
+          volumeMounts:
+            - name: nifi-flows
+              mountPath: /flows
+            - name: nifi-deployer-scripts
+              mountPath: /scripts
+      volumes:
+        - name: nifi-flows
+          configMap:
+            name: nifi-flows
+        - name: nifi-deployer-scripts
+          configMap:
+            name: nifi-deployer-scripts

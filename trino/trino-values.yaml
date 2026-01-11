@@ -1,25 +1,30 @@
 server:
   workers: 1
+  config:
+    query:
+      maxMemory: "1GB"
+additionalConfigProperties:
+  - query.max-memory-per-node=512MB
 coordinator:
   jvm:
-    maxHeapSize: "2G"
+    maxHeapSize: "768M"
   resources:
     limits:
-      cpu: "2"
-      memory: "3Gi"
-    requests:
       cpu: "1"
-      memory: "2Gi"
+      memory: "1Gi"
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
 worker:
   jvm:
-    maxHeapSize: "2G"
+    maxHeapSize: "768M"
   resources:
     limits:
-      cpu: "2"
-      memory: "3Gi"
-    requests:
       cpu: "1"
-      memory: "2Gi"
+      memory: "1Gi"
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
 catalogs:
   cassandra.properties: |
     connector.name=cassandra

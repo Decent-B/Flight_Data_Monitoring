@@ -12,9 +12,6 @@ COPY spark/ /app/spark/
 # COPY src/kafka_reader.py /app/kafka_reader.py
 # COPY src/utils.py /app/utils.py
  
-# Update Kafka bootstrap servers for Docker network - use internal container names
-RUN sed -i 's/localhost:29092,localhost:29093,localhost:29094/kafka-broker-1:9092,kafka-broker-2:9092,kafka-broker-3:9092/g' /app/spark/reader.py
- 
 # Create directories with proper permissions
 RUN mkdir -p /tmp/checkpoints /tmp/spark-events /opt/spark/.ivy2 /opt/spark/work-dir && \
     chmod -R 777 /tmp/checkpoints /tmp/spark-events /opt/spark/.ivy2 && \

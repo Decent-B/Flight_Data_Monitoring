@@ -54,7 +54,7 @@ minikube service -n superset superset --url
 ```bash
 kubectl port-forward -n superset svc/superset 8088:8088
 ```
-Then access: http://localhost:8088
+Then access: http://<superset-host>:8088
 
 ### Login Credentials:
 - **Username**: `admin`

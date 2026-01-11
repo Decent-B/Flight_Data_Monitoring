@@ -56,15 +56,15 @@ The following datasets have been automatically added from your Cassandra tables:
 minikube service -n superset superset --url
 ```
 
-Then open the URL in your browser (e.g., `http://127.0.0.1:46524`)
+Then open the URL in your browser (e.g., `http://<minikube-ip>:<nodeport>`)
 
 ### Option 2: Port Forward
 
 ```bash
-kubectl port-forward -n superset svc/superset 8088:8088
+kubectl port-forward --address 0.0.0.0 -n superset svc/superset 8088:8088
 ```
 
-Then access: http://localhost:8088
+Then access: http://<host-ip>:8088
 
 ### Login Credentials
 
@@ -151,7 +151,7 @@ vim k8s/seed-cassandra-data.sh
 kubectl port-forward -n trino svc/trino 8080:8080
 
 # Use Trino CLI or connect from your SQL client
-# Connection: trino://localhost:8080
+# Connection: trino://<trino-host>:8080
 # Catalog: cassandra.properties
 # Schema: flight_analytics
 ```
